@@ -7,12 +7,19 @@ sellers.
 
 ## Status
 
-**Phase 1 + 2 complete:** design system, responsive landing page, a real
+**Phase 1 + 2 + 3 complete:** design system, responsive landing page, a real
 Supabase-backed authentication system (register, login, logout, forgot/reset
-password, email confirmation), protected dashboard routes, and a `profiles`
-table with Row Level Security. The product wizard, AI generation, and billing
-are not wired up yet — see the implementation phases in the project brief for
-what's next.
+password, email confirmation), a real onboarding wizard, a full authenticated
+dashboard, and Supabase-backed product/project management (create, rename,
+duplicate, archive, delete — all RLS-protected). The AI generation wizard,
+design/mockup/listing generation, and billing are not wired up yet — see the
+implementation phases in the project brief for what's next.
+
+**Pending manual step:** `supabase/migrations/20260922140000_create_projects.sql`
+has not been applied to the live project yet. Until it is, product-management
+pages show a clear "isn't set up yet" notice instead of erroring — nothing
+crashes, but you won't see products until you apply it (see
+[`supabase/README.md`](./supabase/README.md)).
 
 Until a real Supabase project is connected (see below), `/login`,
 `/register`, `/dashboard`, etc. render a clear "Supabase isn't configured
@@ -58,22 +65,24 @@ src/
     (marketing)/   # public landing page
     (auth)/        # login, register, forgot/reset password
     auth/          # /auth/confirm route handler (email links), error page
-    dashboard/     # protected authenticated app shell
-    onboarding/    # protected post-signup landing page (placeholder)
-    actions/       # Server Actions (sign out, complete onboarding)
+    dashboard/     # protected authenticated app shell + Create Product + My Products
+    onboarding/    # protected real onboarding wizard (redirects until completed)
+    actions/       # Server Actions (auth, onboarding, project CRUD)
   components/
-    ui/            # reusable primitives (button, card, input, ...)
+    ui/            # reusable primitives (button, card, input, dialog, select, ...)
     layout/        # header, footer, logo
     marketing/      # landing page sections
     auth/          # auth forms
-    dashboard/     # dashboard shell, sidebar nav, setup notice
+    dashboard/     # dashboard shell, sidebar nav, setup notice, empty states
+    onboarding/    # onboarding wizard + selectable-card primitive
+    products/      # project card + create/rename/duplicate/archive/delete
     theme/         # dark mode provider/toggle
-  config/          # centrally stored site nav, pricing plans, dashboard nav
+  config/          # centrally stored nav, pricing plans, onboarding options, product types
   lib/
-    supabase/      # browser/server Supabase clients, proxy session refresh
+    supabase/      # browser/server Supabase clients, proxy session refresh, db-error helpers
     validations/   # zod schemas
   types/           # hand-written Supabase Database types
   proxy.ts         # Next.js 16 proxy (formerly middleware) — session refresh + route protection
 supabase/
-  migrations/      # SQL migrations (profiles table, RLS, triggers)
+  migrations/      # SQL migrations (profiles + projects tables, RLS, triggers)
 ```

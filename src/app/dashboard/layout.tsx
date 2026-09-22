@@ -35,6 +35,13 @@ export default async function DashboardLayout({
 
   const { user, profile } = auth;
 
+  // New users who haven't finished onboarding land here first; the
+  // onboarding page itself redirects back to /dashboard once complete, so
+  // this never loops.
+  if (!profile?.onboarding_completed) {
+    redirect("/onboarding");
+  }
+
   return (
     <DashboardShell
       email={user.email ?? ""}

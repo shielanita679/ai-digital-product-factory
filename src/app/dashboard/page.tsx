@@ -1,46 +1,89 @@
 import type { Metadata } from "next";
-import { Coins, FolderKanban, Palette, Download, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { Coins, DatabaseZap, FolderKanban, Palette, Download, Sparkles, LayoutTemplate } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/dashboard/empty-state";
+import { ProjectCard } from "@/components/products/project-card";
+import { createClient } from "@/lib/supabase/server";
+import { isMissingTableError } from "@/lib/supabase/db-error";
+import { getPlan } from "@/config/plans";
 
 export const metadata: Metadata = {
   title: "Dashboard",
 };
 
-const stats = [
-  { label: "Credits remaining", value: "20", icon: Coins },
-  { label: "Products", value: "0", icon: FolderKanban },
-  { label: "Designs generated", value: "0", icon: Palette },
-  { label: "Downloads", value: "0", icon: Download },
-];
-
 const templateTeasers = [
   "Christmas SVG Bundle",
   "Halloween SVG Bundle",
-  "Teacher SVG Bundle",
   "Funny Cat Bundle",
-  "Dog Mom Bundle",
+  "Teacher SVG Bundle",
+  "Wedding SVG",
   "Floral Bundle",
 ];
 
-export default function DashboardPage() {
+const freePlan = getPlan("free");
+
+export default async function DashboardPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // The layout already guarantees a session; this is defense in depth.
+  if (!user) {
+    redirect("/login");
+  }
+
+  const [{ data: profile }, projectsResult, countResult] = await Promise.all([
+    supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+    supabase
+      .from("projects")
+      .select("*")
+      .eq("archived", false)
+      .order("created_at", { ascending: false })
+      .limit(4),
+    supabase
+      .from("projects")
+      .select("*", { count: "exact", head: true })
+      .eq("archived", false),
+  ]);
+
+  const firstName = profile?.full_name?.trim().split(" ")[0] || null;
+  const projectsMigrationMissing = isMissingTableError(projectsResult.error);
+  const recentProjects = projectsResult.data;
+
+  const stats = [
+    { label: "Credits remaining", value: "—", icon: Coins, note: "Coming soon" },
+    {
+      label: "Products",
+      value: projectsMigrationMissing ? "—" : String(countResult.count ?? 0),
+      icon: FolderKanban,
+      note: projectsMigrationMissing ? "Migration not applied yet" : undefined,
+    },
+    { label: "Designs generated", value: "—", icon: Palette, note: "Coming soon" },
+    { label: "Downloads", value: "—", icon: Download, note: "Coming soon" },
+  ];
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome back
+            Welcome back{firstName ? `, ${firstName}` : ""}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Here&apos;s an overview of your account. The product wizard
-            unlocks in a future phase of the build.
+            Here&apos;s what&apos;s happening with your products.
           </p>
         </div>
-        <Button variant="brand" disabled className="opacity-70">
-          <Sparkles className="size-4" />
-          Create Product
+        <Button variant="brand" asChild>
+          <Link href="/dashboard/create">
+            <Sparkles className="size-4" />
+            Create Product
+          </Link>
         </Button>
       </div>
 
@@ -54,12 +97,10 @@ export default function DashboardPage() {
                   <Icon className="size-5" />
                 </span>
                 <div>
-                  <p className="text-xl font-semibold leading-none">
+                  <p className="text-xl font-semibold leading-none" title={stat.note}>
                     {stat.value}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {stat.label}
-                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
                 </div>
               </CardContent>
             </Card>
@@ -67,25 +108,89 @@ export default function DashboardPage() {
         })}
       </div>
 
-      <Card>
-        <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-brand-gradient text-white">
-            <FolderKanban className="size-6" />
-          </span>
-          <h2 className="text-lg font-semibold">No products yet</h2>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            Turn your first idea into a complete digital product.
-          </p>
-          <Button variant="brand" disabled className="mt-2 opacity-70">
-            <Sparkles className="size-4" />
-            Create Product
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="flex flex-col gap-3 lg:col-span-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">Recent products</h2>
+            {recentProjects && recentProjects.length > 0 && (
+              <Link
+                href="/dashboard/products"
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                View all
+              </Link>
+            )}
+          </div>
+
+          {projectsMigrationMissing ? (
+            <EmptyState
+              icon={DatabaseZap}
+              title="Product management isn't set up yet"
+              description="The database migration for products hasn't been applied to this project yet."
+            />
+          ) : recentProjects && recentProjects.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {recentProjects.map((project) => (
+                <ProjectCard key={project.id} project={project} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={FolderKanban}
+              title="No products yet"
+              description="Turn your first idea into a complete digital product."
+              action={
+                <Button variant="brand" asChild>
+                  <Link href="/dashboard/create">
+                    <Sparkles className="size-4" />
+                    Create Product
+                  </Link>
+                </Button>
+              }
+            />
+          )}
+        </div>
+
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Current plan</CardTitle>
+              <CardDescription>Billing isn&apos;t connected yet.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">{freePlan.name} plan</p>
+                <p className="text-xs text-muted-foreground">Default for new accounts</p>
+              </div>
+              <Button variant="outline" size="sm" disabled className="opacity-70">
+                Upgrade
+              </Button>
+            </CardContent>
+          </Card>
+
+          <EmptyState
+            icon={Palette}
+            title="No designs yet"
+            description="Generated designs will show up here."
+            compact
+          />
+
+          <EmptyState
+            icon={Download}
+            title="No downloads yet"
+            description="Finished product packages will show up here."
+            compact
+          />
+        </div>
+      </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Quick-start templates</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <LayoutTemplate className="size-4" />
+            Quick-start templates
+          </CardTitle>
+          <CardDescription>Preview only for now — generation arrives in a later phase.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           {templateTeasers.map((template) => (

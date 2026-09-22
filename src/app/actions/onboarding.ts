@@ -1,23 +1,38 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/current-user";
+import { onboardingSchema } from "@/lib/validations/onboarding";
 
-export async function completeOnboardingAction() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export type SaveOnboardingResult = { ok: true } | { ok: false; error: string };
 
-  if (!user) {
-    redirect("/login");
+export async function saveOnboardingAction(input: unknown): Promise<SaveOnboardingResult> {
+  const parsed = onboardingSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Please complete all steps before continuing.",
+    };
   }
 
-  await supabase
+  const { supabase, user } = await requireUser();
+
+  const { error } = await supabase
     .from("profiles")
-    .update({ onboarding_completed: true })
+    .update({
+      sells_what: parsed.data.sellsWhat,
+      sells_where: parsed.data.sellsWhere,
+      monthly_product_volume: parsed.data.monthlyVolume,
+      onboarding_completed: true,
+    })
     .eq("id", user.id);
 
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/dashboard");
   redirect("/dashboard");
 }

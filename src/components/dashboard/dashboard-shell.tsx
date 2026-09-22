@@ -80,8 +80,12 @@ export function DashboardShell({
           <div className="hidden lg:block" />
 
           <div className="flex items-center gap-3">
-            <Badge variant="secondary" className="hidden sm:inline-flex">
-              20 credits
+            <Badge
+              variant="outline"
+              className="hidden text-muted-foreground sm:inline-flex"
+              title="Credit tracking isn't wired up yet"
+            >
+              — credits
             </Badge>
             <ThemeToggle />
             <div

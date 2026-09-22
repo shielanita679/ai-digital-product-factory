@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { SupabaseNotConfiguredError } from "@/lib/supabase/env";
@@ -40,4 +41,23 @@ export async function getAuthState(): Promise<AuthState> {
     .single<Profile>();
 
   return { status: "authenticated", user, profile: profile ?? null };
+}
+
+/**
+ * For Server Actions and pages that need a guaranteed-authenticated user
+ * (never trusting a client-supplied id). Redirects to /login if there's no
+ * session — Server Actions can't rely on the proxy or a parent layout for
+ * this, since they run independently of the render tree that invoked them.
+ */
+export async function requireUser() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  return { supabase, user };
 }
