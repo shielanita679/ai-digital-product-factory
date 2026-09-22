@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Digital Product Factory
+
+Turn one idea into a complete sellable digital product in minutes — AI-generated
+designs, transparent PNGs, vector SVGs, mockups, listing copy, and a
+downloadable ZIP package, built for Etsy, Cricut, print-on-demand, and craft
+sellers.
+
+## Status
+
+**Phase 1 complete:** design system, responsive landing page, login/register
+UI, and a placeholder dashboard shell. Authentication, the product wizard, AI
+generation, and billing are not wired up yet — see the implementation phases
+in the project brief for what's next.
+
+## Stack
+
+Next.js (App Router) · TypeScript · Tailwind CSS · shadcn/ui-style
+components · Supabase (planned) · Stripe (planned) · Zod · React Hook Form
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev     # start the dev server
+npm run build   # production build
+npm run start   # run the production build
+npm run lint    # lint the project
+```
 
-## Learn More
+## Environment Variables
 
-To learn more about Next.js, take a look at the following resources:
+See `.env.example` for the full list of variables the app will eventually
+need (Supabase, Stripe, and AI/vector/mockup provider keys). Copy it to
+`.env.local` and never commit real credentials.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+  app/
+    (marketing)/   # public landing page
+    (auth)/        # login, register
+    dashboard/     # authenticated app shell (placeholder)
+  components/
+    ui/            # reusable primitives (button, card, input, ...)
+    layout/        # header, footer, logo
+    marketing/      # landing page sections
+    auth/          # auth forms
+    theme/         # dark mode provider/toggle
+  config/          # centrally stored site nav, pricing plans, dashboard nav
+  lib/             # utilities, validation schemas
+```
