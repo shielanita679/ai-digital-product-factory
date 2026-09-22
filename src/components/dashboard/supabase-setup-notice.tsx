@@ -20,7 +20,7 @@ export function SupabaseSetupNotice() {
             Add <code className="rounded bg-muted px-1 py-0.5 text-foreground">NEXT_PUBLIC_SUPABASE_URL</code>{" "}
             and{" "}
             <code className="rounded bg-muted px-1 py-0.5 text-foreground">
-              NEXT_PUBLIC_SUPABASE_ANON_KEY
+              NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
             </code>{" "}
             to <code className="rounded bg-muted px-1 py-0.5 text-foreground">.env.local</code>{" "}
             (see <code className="rounded bg-muted px-1 py-0.5 text-foreground">.env.example</code>),

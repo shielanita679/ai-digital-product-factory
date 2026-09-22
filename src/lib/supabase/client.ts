@@ -9,6 +9,6 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
  * configured yet — the clear error only surfaces when auth is used.
  */
 export function createClient() {
-  const { url, anonKey } = getSupabaseEnv();
-  return createBrowserClient<Database>(url, anonKey);
+  const { url, publishableKey } = getSupabaseEnv();
+  return createBrowserClient<Database>(url, publishableKey);
 }

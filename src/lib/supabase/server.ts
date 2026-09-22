@@ -10,10 +10,10 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
  * missing — callers that need a friendly fallback should catch it.
  */
 export async function createClient() {
-  const { url, anonKey } = getSupabaseEnv();
+  const { url, publishableKey } = getSupabaseEnv();
   const cookieStore = await cookies();
 
-  return createServerClient<Database>(url, anonKey, {
+  return createServerClient<Database>(url, publishableKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

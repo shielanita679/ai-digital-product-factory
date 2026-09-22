@@ -1,9 +1,14 @@
 # Supabase setup
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. In **Project Settings → API**, copy the Project URL, `anon` public key,
-   and `service_role` secret key into `.env.local` (see `.env.example` at
-   the repo root — never commit `.env.local`).
+2. In **Project Settings → API**, copy the Project URL, Publishable key
+   (`sb_publishable_...`), and Secret key (`sb_secret_...`) into
+   `.env.local` as `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` (see
+   `.env.example` at the repo root — never commit `.env.local`). Older
+   projects that instead show a legacy `anon` / `service_role` JWT pair can
+   use those under `NEXT_PUBLIC_SUPABASE_ANON_KEY` /
+   `SUPABASE_SERVICE_ROLE_KEY` — the app accepts either naming.
 3. Apply the migrations in `migrations/` in order, either:
    - **Dashboard**: open **SQL Editor**, paste each file's contents, run.
    - **CLI**: `supabase link --project-ref <your-project-ref>` then
