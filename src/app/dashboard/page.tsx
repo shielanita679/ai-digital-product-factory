@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { ProjectCard } from "@/components/products/project-card";
 import { createClient } from "@/lib/supabase/server";
-import { isMissingTableError } from "@/lib/supabase/db-error";
+import { isMigrationNotAppliedError } from "@/lib/supabase/db-error";
 import { getPlan } from "@/config/plans";
 
 export const metadata: Metadata = {
@@ -53,7 +53,7 @@ export default async function DashboardPage() {
   ]);
 
   const firstName = profile?.full_name?.trim().split(" ")[0] || null;
-  const projectsMigrationMissing = isMissingTableError(projectsResult.error);
+  const projectsMigrationMissing = isMigrationNotAppliedError(projectsResult.error);
   const recentProjects = projectsResult.data;
 
   const stats = [

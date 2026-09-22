@@ -73,6 +73,22 @@ export type Database = {
           archived: boolean;
           created_at: string;
           updated_at: string;
+          // Phase 4 — wizard configuration. Undefined at runtime (not just
+          // null) if the migration hasn't been applied yet; code reading
+          // these must not assume they're always present.
+          user_prompt: string | null;
+          style: string[];
+          custom_style: string | null;
+          target_audience: string[];
+          custom_audience: string | null;
+          requested_design_count: number;
+          content_mode: string;
+          color_mode: string;
+          custom_colors: string[];
+          transparent_background: boolean;
+          orientation: string;
+          detail_level: string;
+          generation_config: Json;
         };
         Insert: {
           id?: string;
@@ -85,6 +101,19 @@ export type Database = {
           archived?: boolean;
           created_at?: string;
           updated_at?: string;
+          user_prompt?: string | null;
+          style?: string[];
+          custom_style?: string | null;
+          target_audience?: string[];
+          custom_audience?: string | null;
+          requested_design_count?: number;
+          content_mode?: string;
+          color_mode?: string;
+          custom_colors?: string[];
+          transparent_background?: boolean;
+          orientation?: string;
+          detail_level?: string;
+          generation_config?: Json;
         };
         Update: {
           id?: string;
@@ -97,6 +126,19 @@ export type Database = {
           archived?: boolean;
           created_at?: string;
           updated_at?: string;
+          user_prompt?: string | null;
+          style?: string[];
+          custom_style?: string | null;
+          target_audience?: string[];
+          custom_audience?: string | null;
+          requested_design_count?: number;
+          content_mode?: string;
+          color_mode?: string;
+          custom_colors?: string[];
+          transparent_background?: boolean;
+          orientation?: string;
+          detail_level?: string;
+          generation_config?: Json;
         };
         Relationships: [
           {

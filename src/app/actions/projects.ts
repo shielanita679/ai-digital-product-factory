@@ -5,11 +5,11 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/current-user";
 import { friendlyDbErrorMessage } from "@/lib/supabase/db-error";
 import {
-  createProjectSchema,
   renameProjectSchema,
   projectIdSchema,
   setProjectArchivedSchema,
 } from "@/lib/validations/project";
+import { wizardConfigSchema } from "@/lib/validations/wizard";
 import type { Project } from "@/types/supabase";
 
 export type ActionResult<T = undefined> =
@@ -26,15 +26,24 @@ function revalidateProductPaths(id?: string) {
   if (id) revalidatePath(`/dashboard/products/${id}`);
 }
 
-export async function createProjectAction(
+export async function createProjectFromWizardAction(
   input: unknown,
 ): Promise<ActionResult<Project>> {
-  const parsed = createProjectSchema.safeParse(input);
+  const parsed = wizardConfigSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: firstIssueMessage(parsed.error, "Invalid input") };
+    return { ok: false, error: firstIssueMessage(parsed.error, "Please check your entries.") };
   }
 
   const { supabase, user } = await requireUser();
+  const wizard = parsed.data;
+
+  const customColors =
+    wizard.colorMode === "custom" && wizard.customColors.trim().length > 0
+      ? wizard.customColors
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean)
+      : [];
 
   // user_id always comes from the server-verified session, never from the
   // client payload — RLS also enforces this independently.
@@ -42,8 +51,21 @@ export async function createProjectAction(
     .from("projects")
     .insert({
       user_id: user.id,
-      name: parsed.data.name,
-      product_type: parsed.data.productType,
+      name: wizard.name,
+      product_type: wizard.productType,
+      status: "in_progress",
+      user_prompt: wizard.prompt,
+      style: wizard.styles,
+      custom_style: wizard.customStyle.trim() || null,
+      target_audience: wizard.audiences,
+      custom_audience: wizard.customAudience.trim() || null,
+      requested_design_count: wizard.designCount,
+      content_mode: wizard.contentMode,
+      color_mode: wizard.colorMode,
+      custom_colors: customColors,
+      transparent_background: wizard.transparentBackground,
+      orientation: wizard.orientation,
+      detail_level: wizard.detailLevel,
     })
     .select()
     .single();

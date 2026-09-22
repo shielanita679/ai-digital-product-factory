@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { ProjectCard } from "@/components/products/project-card";
 import { createClient } from "@/lib/supabase/server";
-import { isMissingTableError } from "@/lib/supabase/db-error";
+import { isMigrationNotAppliedError } from "@/lib/supabase/db-error";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -65,7 +65,7 @@ export default async function ProductsPage({
         ))}
       </div>
 
-      {error && isMissingTableError(error) && (
+      {error && isMigrationNotAppliedError(error) && (
         <EmptyState
           icon={DatabaseZap}
           title="Product management isn't set up yet"
@@ -73,7 +73,7 @@ export default async function ProductsPage({
         />
       )}
 
-      {error && !isMissingTableError(error) && (
+      {error && !isMigrationNotAppliedError(error) && (
         <p className="text-sm text-destructive">Couldn&apos;t load products: {error.message}</p>
       )}
 

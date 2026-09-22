@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Loader2, PartyPopper } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SelectableCard } from "@/components/onboarding/selectable-card";
+import { SelectableCard } from "@/components/ui/selectable-card";
 import {
   sellsWhatOptions,
   sellsWhereOptions,
