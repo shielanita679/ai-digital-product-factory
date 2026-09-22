@@ -504,9 +504,25 @@ export async function deleteDesign(ctx: GenerationContext, designId: string): Pr
     throw new GenerationServiceError("Design not found.", "not_found");
   }
 
-  if (design.storage_path) {
+  // Phase 7: a design may also own a vector derivative (vector.svg) in
+  // Storage. `vectorizations` cascades away at the DB level once the
+  // design row below is deleted (design_id references designs(id) on
+  // delete cascade), but — exactly like the raster original — its
+  // Storage object is not part of that cascade and must be removed here.
+  // `data` comes back null both when there's genuinely no vectorization
+  // row and when the Phase 7 migration hasn't been applied yet, so this
+  // degrades safely either way without touching the raster delete path.
+  const { data: vectorization } = await ctx.supabase
+    .from("vectorizations")
+    .select("storage_path")
+    .eq("design_id", designId)
+    .maybeSingle();
+
+  const storagePaths = [design.storage_path, vectorization?.storage_path].filter((p): p is string => !!p);
+
+  if (storagePaths.length > 0) {
     const storage = new DesignStorage(ctx.supabase);
-    const result = await storage.delete(design.storage_path);
+    const result = await storage.deleteMany(storagePaths);
     if (!result.ok) {
       throw new GenerationServiceError("Could not delete the stored image. Please try again.", "db_error");
     }
@@ -550,7 +566,22 @@ export async function cleanupProjectStorage(ctx: GenerationContext, projectId: s
     .eq("user_id", ctx.userId)
     .not("storage_path", "is", null);
 
-  const paths = (designs ?? []).map((d) => d.storage_path).filter((p): p is string => !!p);
+  // Phase 7: vector derivatives (vector.svg) live in the same bucket
+  // under the same design-owned prefixes and need the same explicit
+  // cleanup as raster originals — Postgres's cascade only removes the
+  // vectorizations DB rows, not their Storage objects. `vectorizations`
+  // simply comes back empty (not an error) before the Phase 7 migration
+  // is applied, so this stays a no-op addition until then.
+  const { data: vectorizations } = await ctx.supabase
+    .from("vectorizations")
+    .select("storage_path")
+    .eq("project_id", projectId)
+    .eq("user_id", ctx.userId)
+    .not("storage_path", "is", null);
+
+  const paths = [...(designs ?? []), ...(vectorizations ?? [])]
+    .map((row) => row.storage_path)
+    .filter((p): p is string => !!p);
   if (paths.length === 0) return;
 
   const storage = new DesignStorage(ctx.supabase);

@@ -40,3 +40,21 @@ export const designStatusMeta: Record<
 export function designStatusLabel(status: string): string {
   return designStatusMeta[status as DesignStatus]?.label ?? status;
 }
+
+// Phase 7 — vectorization status (mirrors DESIGN_STATUS_VALUES's shape).
+export const VECTORIZATION_STATUS_VALUES = ["queued", "processing", "completed", "failed"] as const;
+export type VectorizationStatus = (typeof VECTORIZATION_STATUS_VALUES)[number];
+
+export const vectorizationStatusMeta: Record<
+  VectorizationStatus,
+  { label: string; badgeVariant: "outline" | "secondary" | "accent" | "success" }
+> = {
+  queued: { label: "Queued", badgeVariant: "outline" },
+  processing: { label: "Vectorizing…", badgeVariant: "secondary" },
+  completed: { label: "Vector Ready", badgeVariant: "success" },
+  failed: { label: "Vectorization Failed", badgeVariant: "outline" },
+};
+
+export function vectorizationStatusLabel(status: string): string {
+  return vectorizationStatusMeta[status as VectorizationStatus]?.label ?? status;
+}

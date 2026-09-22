@@ -32,6 +32,21 @@ export function buildDesignObjectPath(userId: string, projectId: string, designI
   return `${userId}/${projectId}/${designId}/original.${extension}`;
 }
 
+/**
+ * Phase 7: the vector derivative of a design lives alongside its raster
+ * original, under the SAME `{userId}/{projectId}/{designId}/` prefix —
+ * the existing Storage RLS policies (see
+ * 20260925000000_add_design_storage.sql) only check that first path
+ * segment against `auth.uid()`, so `vector.svg` is already covered by
+ * them with zero new policies needed. Fixed filename/extension (not
+ * MIME-derived like buildDesignObjectPath) because a design has at most
+ * one canonical current vector result — see the vectorizations table's
+ * `unique(design_id)` constraint.
+ */
+export function buildVectorObjectPath(userId: string, projectId: string, designId: string): string {
+  return `${userId}/${projectId}/${designId}/vector.svg`;
+}
+
 export class DesignStorageError extends Error {
   constructor(
     message: string,
@@ -75,6 +90,42 @@ export class DesignStorage {
     }
 
     return { bucket: GENERATED_DESIGNS_BUCKET, path, sizeBytes: input.bytes.byteLength };
+  }
+
+  /**
+   * Phase 7: uploads a design's validated, sanitized vector SVG to its
+   * canonical `vector.svg` path — a thin sibling of `upload()` above, not
+   * a change to it, so raster upload behavior is untouched. `upsert: true`
+   * for the same reason as `upload()`: a retry re-uses the same design id
+   * and should overwrite the same object, never orphan the previous one.
+   */
+  async uploadVector(input: {
+    userId: string;
+    projectId: string;
+    designId: string;
+    svgBytes: Buffer;
+  }): Promise<StoredAssetIdentity & { sizeBytes: number }> {
+    const path = buildVectorObjectPath(input.userId, input.projectId, input.designId);
+
+    const { error } = await this.supabase.storage.from(GENERATED_DESIGNS_BUCKET).upload(path, input.svgBytes, {
+      contentType: "image/svg+xml",
+      upsert: true,
+    });
+
+    if (error) {
+      throw new DesignStorageError(`Could not upload the vector SVG to storage.`, error);
+    }
+
+    return { bucket: GENERATED_DESIGNS_BUCKET, path, sizeBytes: input.svgBytes.byteLength };
+  }
+
+  /** Downloads an object's raw bytes — used by the vectorize service to fetch a design's stored raster before sending it to a vector provider. */
+  async download(path: string): Promise<Buffer> {
+    const { data, error } = await this.supabase.storage.from(GENERATED_DESIGNS_BUCKET).download(path);
+    if (error || !data) {
+      throw new DesignStorageError(`Could not download the stored object: ${path}`, error);
+    }
+    return Buffer.from(await data.arrayBuffer());
   }
 
   /**

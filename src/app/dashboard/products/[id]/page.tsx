@@ -17,6 +17,8 @@ import { ProjectDetailActions } from "@/components/products/project-detail-actio
 import { GenerateDesignsSection } from "@/components/generation/generate-designs-section";
 import { DesignGallery } from "@/components/generation/design-gallery";
 import { resolveDesignDisplayUrls } from "@/lib/storage/resolve-design-display-urls";
+import { resolveVectorDisplayUrls } from "@/lib/storage/resolve-vector-display-urls";
+import { resolveVectorizationsForDesigns } from "@/lib/vector/vectorize-service";
 import { productTypeLabel, projectStatusLabel, projectStatusMeta } from "@/config/product-types";
 import { styleOptions } from "@/config/styles";
 import { audienceOptions } from "@/config/audiences";
@@ -109,6 +111,8 @@ export default async function ProductDetailPage({
   const latestJob = generationMigrationApplied ? (latestJobResult.data ?? null) : null;
   const designs = generationMigrationApplied ? (designsResult.data ?? []) : [];
   const displayUrlById = await resolveDesignDisplayUrls(supabase, designs);
+  const vectorizationByDesignId = await resolveVectorizationsForDesigns(supabase, designs.map((d) => d.id));
+  const vectorPreviewUrlByVectorizationId = await resolveVectorDisplayUrls(supabase, Array.from(vectorizationByDesignId.values()));
 
   const statusMeta = projectStatusMeta[project.status as keyof typeof projectStatusMeta];
 
@@ -280,7 +284,12 @@ export default async function ProductDetailPage({
           </p>
           <div className="mt-4">
             {designs.length > 0 ? (
-              <DesignGallery designs={designs} displayUrlById={displayUrlById} />
+              <DesignGallery
+                designs={designs}
+                displayUrlById={displayUrlById}
+                vectorizationByDesignId={vectorizationByDesignId}
+                vectorPreviewUrlByVectorizationId={vectorPreviewUrlByVectorizationId}
+              />
             ) : (
               <EmptyState
                 icon={Palette}

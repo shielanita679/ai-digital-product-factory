@@ -9,6 +9,8 @@ import { DesignGallery } from "@/components/generation/design-gallery";
 import { createClient } from "@/lib/supabase/server";
 import { isMigrationNotAppliedError } from "@/lib/supabase/db-error";
 import { resolveDesignDisplayUrls } from "@/lib/storage/resolve-design-display-urls";
+import { resolveVectorDisplayUrls } from "@/lib/storage/resolve-vector-display-urls";
+import { resolveVectorizationsForDesigns } from "@/lib/vector/vectorize-service";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -67,6 +69,8 @@ export default async function DesignsPage({
     }
   }
   const displayUrlById = await resolveDesignDisplayUrls(supabase, designs ?? []);
+  const vectorizationByDesignId = await resolveVectorizationsForDesigns(supabase, (designs ?? []).map((d) => d.id));
+  const vectorPreviewUrlByVectorizationId = await resolveVectorDisplayUrls(supabase, Array.from(vectorizationByDesignId.values()));
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -100,6 +104,8 @@ export default async function DesignsPage({
         <DesignGallery
           designs={designs}
           displayUrlById={displayUrlById}
+          vectorizationByDesignId={vectorizationByDesignId}
+          vectorPreviewUrlByVectorizationId={vectorPreviewUrlByVectorizationId}
           showProjectNames
           projectNameById={projectNameById}
         />

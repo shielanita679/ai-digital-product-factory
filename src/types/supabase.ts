@@ -323,6 +323,115 @@ export type Database = {
           },
         ];
       };
+      // Phase 7 — vector (SVG) derivative of a design's raster original.
+      // One canonical row per design (unique(design_id)); a retry updates
+      // the same row rather than inserting a new one. Undefined at
+      // runtime (not just null/missing rows) if this migration hasn't
+      // been applied yet — code reading this table must degrade
+      // gracefully, exactly like every other post-Phase-4 table.
+      vectorizations: {
+        Row: {
+          id: string;
+          user_id: string;
+          project_id: string;
+          design_id: string;
+          status: string;
+          provider: string;
+          provider_vectorization_id: string | null;
+          storage_bucket: string | null;
+          storage_path: string | null;
+          mime_type: string | null;
+          file_size_bytes: number | null;
+          width: number | null;
+          height: number | null;
+          view_box: string | null;
+          path_count: number | null;
+          shape_count: number | null;
+          color_count: number | null;
+          has_embedded_raster: boolean;
+          settings: Json;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+          started_at: string | null;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          project_id: string;
+          design_id: string;
+          status?: string;
+          provider?: string;
+          provider_vectorization_id?: string | null;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
+          mime_type?: string | null;
+          file_size_bytes?: number | null;
+          width?: number | null;
+          height?: number | null;
+          view_box?: string | null;
+          path_count?: number | null;
+          shape_count?: number | null;
+          color_count?: number | null;
+          has_embedded_raster?: boolean;
+          settings?: Json;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          project_id?: string;
+          design_id?: string;
+          status?: string;
+          provider?: string;
+          provider_vectorization_id?: string | null;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
+          mime_type?: string | null;
+          file_size_bytes?: number | null;
+          width?: number | null;
+          height?: number | null;
+          view_box?: string | null;
+          path_count?: number | null;
+          shape_count?: number | null;
+          color_count?: number | null;
+          has_embedded_raster?: boolean;
+          settings?: Json;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "vectorizations_design_id_fkey";
+            columns: ["design_id"];
+            isOneToOne: true;
+            referencedRelation: "designs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "vectorizations_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "vectorizations_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -335,3 +444,4 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 export type GenerationJob = Database["public"]["Tables"]["generation_jobs"]["Row"];
 export type Design = Database["public"]["Tables"]["designs"]["Row"];
+export type Vectorization = Database["public"]["Tables"]["vectorizations"]["Row"];

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { DesignStorage, buildDesignObjectPath, GENERATED_DESIGNS_BUCKET } from "@/lib/storage/design-storage";
+import { DesignStorage, buildDesignObjectPath, buildVectorObjectPath, GENERATED_DESIGNS_BUCKET } from "@/lib/storage/design-storage";
 
 describe("buildDesignObjectPath", () => {
   it("builds an ownership-prefixed path from server-derived ids only", () => {
@@ -37,6 +37,7 @@ function makeFakeSupabase(overrides: Record<string, unknown> = {}) {
     storage: {
       from: vi.fn(() => ({
         upload: vi.fn(async () => ({ data: { path: "x" }, error: null })),
+        download: vi.fn(async () => ({ data: { arrayBuffer: async () => new TextEncoder().encode("fake-bytes").buffer }, error: null })),
         createSignedUrl: vi.fn(async () => ({ data: { signedUrl: "https://signed.example/x" }, error: null })),
         createSignedUrls: vi.fn(async (paths: string[]) => ({
           data: paths.map((p) => ({ path: p, signedUrl: `https://signed.example/${p}`, error: null })),
@@ -49,6 +50,17 @@ function makeFakeSupabase(overrides: Record<string, unknown> = {}) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal test double, not a real SupabaseClient
   } as any;
 }
+
+describe("buildVectorObjectPath", () => {
+  it("builds a fixed vector.svg path under the same per-design prefix as the raster original", () => {
+    expect(buildVectorObjectPath("user-1", "project-1", "design-1")).toBe("user-1/project-1/design-1/vector.svg");
+  });
+
+  it("the first path segment is exactly the user id — what the Storage RLS policy checks against auth.uid()", () => {
+    const path = buildVectorObjectPath("11111111-1111-1111-1111-111111111111", "p", "d");
+    expect(path.split("/")[0]).toBe("11111111-1111-1111-1111-111111111111");
+  });
+});
 
 describe("DesignStorage", () => {
   it("upload() writes to the correct ownership-prefixed path and reports the byte size", async () => {
@@ -124,6 +136,37 @@ describe("DesignStorage", () => {
     const storage = new DesignStorage(supabase);
     const result = await storage.delete("someone-elses/p1/d1/original.png");
     expect(result.ok).toBe(false);
+  });
+
+  it("uploadVector() writes to the fixed vector.svg path and reports the byte size", async () => {
+    const supabase = makeFakeSupabase();
+    const storage = new DesignStorage(supabase);
+    const svgBytes = Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'></svg>");
+
+    const result = await storage.uploadVector({ userId: "u1", projectId: "p1", designId: "d1", svgBytes });
+
+    expect(result.bucket).toBe(GENERATED_DESIGNS_BUCKET);
+    expect(result.path).toBe("u1/p1/d1/vector.svg");
+    expect(result.sizeBytes).toBe(svgBytes.byteLength);
+  });
+
+  it("uploadVector() throws a DesignStorageError (not a raw Supabase error) on failure", async () => {
+    const supabase = makeFakeSupabase({ upload: vi.fn(async () => ({ data: null, error: { message: "denied" } })) });
+    const storage = new DesignStorage(supabase);
+    await expect(storage.uploadVector({ userId: "u1", projectId: "p1", designId: "d1", svgBytes: Buffer.from("x") })).rejects.toThrow(/could not upload/i);
+  });
+
+  it("download() returns the object's raw bytes", async () => {
+    const supabase = makeFakeSupabase();
+    const storage = new DesignStorage(supabase);
+    const bytes = await storage.download("u1/p1/d1/original.png");
+    expect(bytes.toString()).toBe("fake-bytes");
+  });
+
+  it("download() throws a DesignStorageError when the object is unavailable", async () => {
+    const supabase = makeFakeSupabase({ download: vi.fn(async () => ({ data: null, error: { message: "not found" } })) });
+    const storage = new DesignStorage(supabase);
+    await expect(storage.download("u1/p1/d1/original.png")).rejects.toThrow(/could not download/i);
   });
 
   it("deleteMany() reports which paths failed rather than an all-or-nothing result", async () => {
