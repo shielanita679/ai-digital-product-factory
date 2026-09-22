@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, MailCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,11 +13,13 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { registerSchema, type RegisterValues } from "@/lib/validations/auth";
-import { submitAuthPlaceholder } from "@/lib/auth-placeholder";
+import { createClient } from "@/lib/supabase/client";
+import { getAuthErrorMessage } from "@/lib/supabase/error-message";
 
 export function RegisterForm() {
   const router = useRouter();
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(null);
 
   const {
     register,
@@ -31,14 +33,65 @@ export function RegisterForm() {
     },
   });
 
-  async function onSubmit() {
+  async function onSubmit(values: RegisterValues) {
     setFormError(null);
     try {
-      await submitAuthPlaceholder();
-      router.push("/dashboard");
-    } catch {
-      setFormError("Something went wrong. Please try again.");
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: { full_name: values.name },
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=/onboarding`,
+        },
+      });
+
+      if (error) {
+        setFormError(error.message);
+        return;
+      }
+
+      if (data.session) {
+        // Email confirmations are disabled on this project — already signed in.
+        router.push("/onboarding");
+        router.refresh();
+        return;
+      }
+
+      // Email confirmation required before a session is created.
+      setSubmittedEmail(values.email);
+    } catch (error) {
+      setFormError(getAuthErrorMessage(error));
     }
+  }
+
+  if (submittedEmail) {
+    return (
+      <Card>
+        <CardHeader className="items-center text-center">
+          <span className="mb-2 flex size-12 items-center justify-center rounded-2xl bg-brand-gradient text-white">
+            <MailCheck className="size-6" />
+          </span>
+          <CardTitle className="text-xl">Check your email</CardTitle>
+          <CardDescription>
+            We sent a confirmation link to <strong>{submittedEmail}</strong>.
+            Click it to activate your account and get started.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-sm text-muted-foreground">
+            Wrong email?{" "}
+            <button
+              type="button"
+              onClick={() => setSubmittedEmail(null)}
+              className="font-medium text-primary hover:underline"
+            >
+              Try again
+            </button>
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,12 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { loginSchema, type LoginValues } from "@/lib/validations/auth";
+import {
+  resetPasswordSchema,
+  type ResetPasswordValues,
+} from "@/lib/validations/auth";
 import { createClient } from "@/lib/supabase/client";
 import { getAuthErrorMessage } from "@/lib/supabase/error-message";
-import { safeRedirectPath } from "@/lib/safe-redirect";
 
-export function LoginForm({ redirectTo }: { redirectTo?: string }) {
+export function ResetPasswordForm() {
   const router = useRouter();
   const [formError, setFormError] = React.useState<string | null>(null);
 
@@ -24,16 +25,15 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginValues>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<ResetPasswordValues>({
+    resolver: zodResolver(resetPasswordSchema),
   });
 
-  async function onSubmit(values: LoginValues) {
+  async function onSubmit(values: ResetPasswordValues) {
     setFormError(null);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: values.email,
+      const { error } = await supabase.auth.updateUser({
         password: values.password,
       });
 
@@ -42,7 +42,7 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
         return;
       }
 
-      router.push(safeRedirectPath(redirectTo, "/dashboard"));
+      router.push("/dashboard");
       router.refresh();
     } catch (error) {
       setFormError(getAuthErrorMessage(error));
@@ -52,9 +52,9 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Welcome back</CardTitle>
+        <CardTitle className="text-xl">Choose a new password</CardTitle>
         <CardDescription>
-          Log in to continue creating digital products.
+          Set a new password for your account.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -64,34 +64,11 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
           onSubmit={handleSubmit(onSubmit)}
         >
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              aria-invalid={!!errors.email}
-              {...register("email")}
-            />
-            {errors.email && (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link
-                href="/forgot-password"
-                className="text-xs font-medium text-primary hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
+            <Label htmlFor="password">New password</Label>
             <Input
               id="password"
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               placeholder="••••••••"
               aria-invalid={!!errors.password}
               {...register("password")}
@@ -99,6 +76,23 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
             {errors.password && (
               <p className="text-sm text-destructive">
                 {errors.password.message}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm new password</Label>
+            <Input
+              id="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              placeholder="••••••••"
+              aria-invalid={!!errors.confirmPassword}
+              {...register("confirmPassword")}
+            />
+            {errors.confirmPassword && (
+              <p className="text-sm text-destructive">
+                {errors.confirmPassword.message}
               </p>
             )}
           </div>
@@ -114,16 +108,9 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
             disabled={isSubmitting}
           >
             {isSubmitting && <Loader2 className="size-4 animate-spin" />}
-            Log In
+            Update Password
           </Button>
         </form>
-
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="font-medium text-primary hover:underline">
-            Create one
-          </Link>
-        </p>
       </CardContent>
     </Card>
   );
