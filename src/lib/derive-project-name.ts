@@ -1,4 +1,5 @@
-const LEADING_FILLER = /^(please\s+)?(create|make|design|build|generate|i want|i'd like|i need)\s+(a|an|some)?\s*/i;
+const LEADING_FILLER =
+  /^(please\s+)?(?:(?:create|make|design|build|generate|i want|i'd like|i need)\s+)?(?:(?:a|an|some)\s+)?(?:(?:bundle|collection|set|pack|series|group)\s+of\s+)?/i;
 
 const MAX_NAME_LENGTH = 60;
 

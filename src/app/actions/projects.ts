@@ -41,7 +41,7 @@ export async function createProjectFromWizardAction(
     wizard.colorMode === "custom" && wizard.customColors.trim().length > 0
       ? wizard.customColors
           .split(",")
-          .map((c) => c.trim())
+          .map((c) => c.trim().replace(/^and\s+/i, "").trim())
           .filter(Boolean)
       : [];
 
@@ -112,7 +112,9 @@ export async function duplicateProjectAction(
 
   const { data: original, error: fetchError } = await supabase
     .from("projects")
-    .select("name, product_type")
+    .select(
+      "name, product_type, user_prompt, style, custom_style, target_audience, custom_audience, requested_design_count, content_mode, color_mode, custom_colors, transparent_background, orientation, detail_level",
+    )
     .eq("id", parsed.data.id)
     .eq("user_id", user.id)
     .single();
@@ -121,12 +123,28 @@ export async function duplicateProjectAction(
     return { ok: false, error: friendlyDbErrorMessage(fetchError, "Product not found.") };
   }
 
+  // Carries over the full wizard configuration, not just name/type — a
+  // duplicate is a fresh, ungenerated copy of the same product setup, so
+  // status/design_count/generation_config stay at their table defaults
+  // rather than being copied.
   const { data, error } = await supabase
     .from("projects")
     .insert({
       user_id: user.id,
       name: `${original.name} (Copy)`.slice(0, 80),
       product_type: original.product_type,
+      user_prompt: original.user_prompt,
+      style: original.style,
+      custom_style: original.custom_style,
+      target_audience: original.target_audience,
+      custom_audience: original.custom_audience,
+      requested_design_count: original.requested_design_count,
+      content_mode: original.content_mode,
+      color_mode: original.color_mode,
+      custom_colors: original.custom_colors,
+      transparent_background: original.transparent_background,
+      orientation: original.orientation,
+      detail_level: original.detail_level,
     })
     .select()
     .single();
