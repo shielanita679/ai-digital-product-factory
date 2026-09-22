@@ -150,6 +150,167 @@ export type Database = {
           },
         ];
       };
+      // Phase 5 — AI generation pipeline foundation.
+      generation_jobs: {
+        Row: {
+          id: string;
+          user_id: string;
+          project_id: string;
+          status: string;
+          provider: string;
+          prompt_engine_version: string;
+          requested_count: number;
+          completed_count: number;
+          failed_count: number;
+          progress: number;
+          error_message: string | null;
+          started_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          project_id: string;
+          status?: string;
+          provider?: string;
+          prompt_engine_version?: string;
+          requested_count: number;
+          completed_count?: number;
+          failed_count?: number;
+          progress?: number;
+          error_message?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          project_id?: string;
+          status?: string;
+          provider?: string;
+          prompt_engine_version?: string;
+          requested_count?: number;
+          completed_count?: number;
+          failed_count?: number;
+          progress?: number;
+          error_message?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "generation_jobs_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "generation_jobs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      designs: {
+        Row: {
+          id: string;
+          user_id: string;
+          project_id: string;
+          generation_job_id: string;
+          variation_index: number;
+          title: string;
+          prompt: string;
+          negative_prompt: string | null;
+          status: string;
+          image_url: string | null;
+          thumbnail_url: string | null;
+          width: number | null;
+          height: number | null;
+          provider: string;
+          provider_generation_id: string | null;
+          error_message: string | null;
+          prompt_engine_version: string;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          project_id: string;
+          generation_job_id: string;
+          variation_index: number;
+          title: string;
+          prompt: string;
+          negative_prompt?: string | null;
+          status?: string;
+          image_url?: string | null;
+          thumbnail_url?: string | null;
+          width?: number | null;
+          height?: number | null;
+          provider?: string;
+          provider_generation_id?: string | null;
+          error_message?: string | null;
+          prompt_engine_version?: string;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          project_id?: string;
+          generation_job_id?: string;
+          variation_index?: number;
+          title?: string;
+          prompt?: string;
+          negative_prompt?: string | null;
+          status?: string;
+          image_url?: string | null;
+          thumbnail_url?: string | null;
+          width?: number | null;
+          height?: number | null;
+          provider?: string;
+          provider_generation_id?: string | null;
+          error_message?: string | null;
+          prompt_engine_version?: string;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "designs_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "designs_generation_job_id_fkey";
+            columns: ["generation_job_id"];
+            isOneToOne: false;
+            referencedRelation: "generation_jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "designs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -160,3 +321,5 @@ export type Database = {
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
+export type GenerationJob = Database["public"]["Tables"]["generation_jobs"]["Row"];
+export type Design = Database["public"]["Tables"]["designs"]["Row"];

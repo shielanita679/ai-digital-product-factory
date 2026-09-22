@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { ProjectCard } from "@/components/products/project-card";
+import { DesignCard } from "@/components/generation/design-card";
 import { createClient } from "@/lib/supabase/server";
 import { isMigrationNotAppliedError } from "@/lib/supabase/db-error";
 import { getPlan } from "@/config/plans";
@@ -38,23 +39,28 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const [{ data: profile }, projectsResult, countResult] = await Promise.all([
-    supabase.from("profiles").select("full_name").eq("id", user.id).single(),
-    supabase
-      .from("projects")
-      .select("*")
-      .eq("archived", false)
-      .order("created_at", { ascending: false })
-      .limit(4),
-    supabase
-      .from("projects")
-      .select("*", { count: "exact", head: true })
-      .eq("archived", false),
-  ]);
+  const [{ data: profile }, projectsResult, countResult, recentDesignsResult, designsCountResult] =
+    await Promise.all([
+      supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+      supabase
+        .from("projects")
+        .select("*")
+        .eq("archived", false)
+        .order("created_at", { ascending: false })
+        .limit(4),
+      supabase
+        .from("projects")
+        .select("*", { count: "exact", head: true })
+        .eq("archived", false),
+      supabase.from("designs").select("*").order("created_at", { ascending: false }).limit(4),
+      supabase.from("designs").select("*", { count: "exact", head: true }).eq("status", "completed"),
+    ]);
 
   const firstName = profile?.full_name?.trim().split(" ")[0] || null;
   const projectsMigrationMissing = isMigrationNotAppliedError(projectsResult.error);
   const recentProjects = projectsResult.data;
+  const designsMigrationMissing = isMigrationNotAppliedError(recentDesignsResult.error);
+  const recentDesigns = designsMigrationMissing ? [] : (recentDesignsResult.data ?? []);
 
   const stats = [
     { label: "Credits remaining", value: "—", icon: Coins, note: "Coming soon" },
@@ -64,7 +70,12 @@ export default async function DashboardPage() {
       icon: FolderKanban,
       note: projectsMigrationMissing ? "Migration not applied yet" : undefined,
     },
-    { label: "Designs generated", value: "—", icon: Palette, note: "Coming soon" },
+    {
+      label: "Designs generated",
+      value: designsMigrationMissing ? "—" : String(designsCountResult.count ?? 0),
+      icon: Palette,
+      note: designsMigrationMissing ? "Migration not applied yet" : undefined,
+    },
     { label: "Downloads", value: "—", icon: Download, note: "Coming soon" },
   ];
 
@@ -168,12 +179,30 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
-          <EmptyState
-            icon={Palette}
-            title="No designs yet"
-            description="Generated designs will show up here."
-            compact
-          />
+          {recentDesigns.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between text-base">
+                  Recent designs
+                  <Link href="/dashboard/designs" className="text-sm font-medium text-primary hover:underline">
+                    View all
+                  </Link>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3">
+                {recentDesigns.map((design) => (
+                  <DesignCard key={design.id} design={design} />
+                ))}
+              </CardContent>
+            </Card>
+          ) : (
+            <EmptyState
+              icon={Palette}
+              title="No designs yet"
+              description="Generated designs will show up here."
+              compact
+            />
+          )}
 
           <EmptyState
             icon={Download}

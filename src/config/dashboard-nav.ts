@@ -24,7 +24,7 @@ export const dashboardNav: DashboardNavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Create Product", href: "/dashboard/create", icon: Sparkles },
   { label: "My Products", href: "/dashboard/products", icon: FolderKanban },
-  { label: "Designs", href: "/dashboard/designs", icon: Palette, comingSoon: true },
+  { label: "Designs", href: "/dashboard/designs", icon: Palette },
   { label: "Mockups", href: "/dashboard/mockups", icon: ImageIcon, comingSoon: true },
   { label: "Downloads", href: "/dashboard/downloads", icon: Download, comingSoon: true },
   { label: "Templates", href: "/dashboard/templates", icon: LayoutTemplate, comingSoon: true },

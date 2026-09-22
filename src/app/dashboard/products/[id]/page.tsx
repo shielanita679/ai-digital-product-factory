@@ -4,19 +4,18 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   DatabaseZap,
-  Palette,
   ImageIcon,
   FileText,
   PackageCheck,
-  Sparkles,
-  CheckCircle2,
+  Palette,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { ProjectDetailActions } from "@/components/products/project-detail-actions";
+import { GenerateDesignsSection } from "@/components/generation/generate-designs-section";
+import { DesignGallery } from "@/components/generation/design-gallery";
 import { productTypeLabel, projectStatusLabel, projectStatusMeta } from "@/config/product-types";
 import { styleOptions } from "@/config/styles";
 import { audienceOptions } from "@/config/audiences";
@@ -52,7 +51,6 @@ export async function generateMetadata({
 }
 
 const futureSections = [
-  { icon: Palette, title: "Designs", description: "AI-generated artwork for this product will appear here." },
   { icon: ImageIcon, title: "Mockups", description: "Product mockups (t-shirts, mugs, posters, and more) will appear here." },
   { icon: FileText, title: "Listing", description: "Generated title, description, tags, and pricing will appear here." },
   { icon: PackageCheck, title: "Package", description: "The final downloadable ZIP package will appear here." },
@@ -88,6 +86,28 @@ export default async function ProductDetailPage({
     notFound();
   }
 
+  // Phase 5 data — queried separately so a not-yet-applied Phase 5
+  // migration degrades gracefully instead of breaking the whole page
+  // (the project itself already loaded fine above).
+  const [latestJobResult, designsResult] = await Promise.all([
+    supabase
+      .from("generation_jobs")
+      .select("*")
+      .eq("project_id", project.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("designs")
+      .select("*")
+      .eq("project_id", project.id)
+      .order("variation_index", { ascending: true }),
+  ]);
+
+  const generationMigrationApplied = !isMigrationNotAppliedError(latestJobResult.error ?? designsResult.error);
+  const latestJob = generationMigrationApplied ? (latestJobResult.data ?? null) : null;
+  const designs = generationMigrationApplied ? (designsResult.data ?? []) : [];
+
   const statusMeta = projectStatusMeta[project.status as keyof typeof projectStatusMeta];
 
   // Present only for projects created via the Phase 4 wizard — absent
@@ -95,6 +115,14 @@ export default async function ProductDetailPage({
   // (undefined, not just null) if this migration hasn't been applied yet.
   // Either way, this is a safe single signal to gate on.
   const hasWizardConfig = Boolean(project.user_prompt);
+  const canGenerate = generationMigrationApplied && hasWizardConfig && !project.archived;
+  const disabledReason = !generationMigrationApplied
+    ? "The generation pipeline's database migration hasn't been applied yet."
+    : !hasWizardConfig
+      ? "This product hasn't completed the setup wizard yet."
+      : project.archived
+        ? "Unarchive this product before generating designs."
+        : null;
   const styles = project.style ?? [];
   const audiences = project.target_audience ?? [];
   const customColors = project.custom_colors ?? [];
@@ -143,26 +171,22 @@ export default async function ProductDetailPage({
         />
       </div>
 
-      {hasWizardConfig && (
-        <Card className="border-accent bg-accent/40">
-          <CardContent className="flex flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-gradient text-white">
-                <CheckCircle2 className="size-4" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold">Product setup complete</p>
-                <p className="text-sm text-muted-foreground">
-                  Your project is ready for design generation.
-                </p>
-              </div>
-            </div>
-            <Button variant="brand" disabled className="shrink-0 opacity-70" title="Generation coming in Phase 5">
-              <Sparkles className="size-4" />
-              Generate Designs
-            </Button>
-          </CardContent>
-        </Card>
+      {!generationMigrationApplied && (
+        <EmptyState
+          icon={DatabaseZap}
+          title="Design generation isn't set up yet"
+          description="The database migration for the generation pipeline hasn't been applied to this project yet."
+          compact
+        />
+      )}
+
+      {generationMigrationApplied && (
+        <GenerateDesignsSection
+          projectId={project.id}
+          initialJob={latestJob}
+          canGenerate={canGenerate}
+          disabledReason={disabledReason}
+        />
       )}
 
       <Card>
@@ -241,6 +265,29 @@ export default async function ProductDetailPage({
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {generationMigrationApplied && (
+        <div>
+          <h2 className="text-lg font-semibold">Designs</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {designs.length > 0
+              ? `${project.design_count} of ${designs.length} design${designs.length === 1 ? "" : "s"} completed.`
+              : "Generated designs for this product will appear here."}
+          </p>
+          <div className="mt-4">
+            {designs.length > 0 ? (
+              <DesignGallery designs={designs} />
+            ) : (
+              <EmptyState
+                icon={Palette}
+                title="No designs yet"
+                description="Click Generate Designs above to create your first mock preview batch."
+                compact
+              />
+            )}
+          </div>
         </div>
       )}
 
