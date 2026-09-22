@@ -72,6 +72,18 @@ describe("DesignStorage", () => {
     ).rejects.toThrow(/could not upload/i);
   });
 
+  it("createSignedUrl() with a filename requests a download-disposition signed URL — a plain <a download> is silently ignored by browsers for cross-origin Storage URLs, found via live download testing", async () => {
+    const createSignedUrlSpy = vi.fn(async () => ({ data: { signedUrl: "https://signed.example/x" }, error: null }));
+    const supabase = makeFakeSupabase({ createSignedUrl: createSignedUrlSpy });
+    const storage = new DesignStorage(supabase);
+
+    await storage.createSignedUrl("u1/p1/d1/original.png", 300, "my-design.png");
+    expect(createSignedUrlSpy).toHaveBeenCalledWith("u1/p1/d1/original.png", 300, { download: "my-design.png" });
+
+    await storage.createSignedUrl("u1/p1/d1/original.png", 300);
+    expect(createSignedUrlSpy).toHaveBeenLastCalledWith("u1/p1/d1/original.png", 300, undefined);
+  });
+
   it("createSignedUrl() returns null instead of throwing when the object is unavailable", async () => {
     const supabase = makeFakeSupabase({ createSignedUrl: vi.fn(async () => ({ data: null, error: { message: "not found" } })) });
     const storage = new DesignStorage(supabase);
@@ -101,6 +113,17 @@ describe("DesignStorage", () => {
     const result = await storage.delete("u1/p1/d1/original.png");
     expect(result.ok).toBe(false);
     expect(result.error).toBeDefined();
+  });
+
+  it("delete() returns { ok: false } when Storage RLS silently permits the call but removes nothing (error: null, empty data) — a real bug found via live cross-user delete testing", async () => {
+    // This is exactly what Supabase Storage's remove() returns when RLS
+    // blocks the delete without raising an explicit error: no `error`,
+    // but an empty `data` array. A bare `if (error)` check would
+    // incorrectly report success for a delete that never happened.
+    const supabase = makeFakeSupabase({ remove: vi.fn(async () => ({ data: [], error: null })) });
+    const storage = new DesignStorage(supabase);
+    const result = await storage.delete("someone-elses/p1/d1/original.png");
+    expect(result.ok).toBe(false);
   });
 
   it("deleteMany() reports which paths failed rather than an all-or-nothing result", async () => {

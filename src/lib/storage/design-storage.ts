@@ -77,10 +77,25 @@ export class DesignStorage {
     return { bucket: GENERATED_DESIGNS_BUCKET, path, sizeBytes: input.bytes.byteLength };
   }
 
-  async createSignedUrl(path: string, expiresInSeconds = DEFAULT_SIGNED_URL_EXPIRY_SECONDS): Promise<string | null> {
+  /**
+   * `downloadFilename`, when set, asks Supabase to serve the signed URL
+   * with `Content-Disposition: attachment; filename=...`. This matters:
+   * the object lives on Supabase's own origin, not this app's, and a
+   * plain `<a download>` attribute is silently ignored by browsers for
+   * cross-origin links (a real bug found via live testing — clicking
+   * "Download Original" just navigated to view the image instead of
+   * downloading it, because the response had no attachment disposition).
+   * Passing `download` here is what actually forces the browser to save
+   * the file instead of displaying it.
+   */
+  async createSignedUrl(
+    path: string,
+    expiresInSeconds = DEFAULT_SIGNED_URL_EXPIRY_SECONDS,
+    downloadFilename?: string,
+  ): Promise<string | null> {
     const { data, error } = await this.supabase.storage
       .from(GENERATED_DESIGNS_BUCKET)
-      .createSignedUrl(path, expiresInSeconds);
+      .createSignedUrl(path, expiresInSeconds, downloadFilename ? { download: downloadFilename } : undefined);
 
     if (error || !data?.signedUrl) {
       // Missing/expired object, revoked access, etc. — callers treat a
@@ -112,10 +127,22 @@ export class DesignStorage {
    * Best-effort delete — returns a result rather than throwing, so callers
    * (see generation-service.deleteDesign) can decide how to treat a
    * storage failure instead of every call site needing a try/catch.
+   *
+   * Delegates to deleteMany() rather than calling `.remove()` directly:
+   * Supabase Storage's `remove()` can return `error: null` with an EMPTY
+   * `data` array when RLS silently permits the call but matches nothing
+   * (e.g. the path belongs to another user, or doesn't exist) — a bare
+   * `if (error)` check would then report `ok: true` for a delete that
+   * never actually happened. deleteMany() already verifies removal by
+   * checking which paths actually come back in `data`; delete() reuses
+   * that instead of duplicating (and, as found in live testing, getting
+   * wrong) the same check.
    */
   async delete(path: string): Promise<{ ok: boolean; error?: string }> {
-    const { error } = await this.supabase.storage.from(GENERATED_DESIGNS_BUCKET).remove([path]);
-    if (error) return { ok: false, error: error.message };
+    const result = await this.deleteMany([path]);
+    if (!result.ok) {
+      return { ok: false, error: `Object was not removed: ${path}` };
+    }
     return { ok: true };
   }
 

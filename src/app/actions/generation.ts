@@ -91,14 +91,14 @@ export async function getDesignDownloadUrlAction(input: unknown): Promise<Action
     return { ok: false, error: "This is a mock development preview — there's no real file to download yet." };
   }
 
+  const extension = design.storage_path.split(".").pop() || "png";
+  const filename = `${design.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.${extension}`;
+
   const storage = new DesignStorage(supabase);
-  const url = await storage.createSignedUrl(design.storage_path, 300);
+  const url = await storage.createSignedUrl(design.storage_path, 300, filename);
   if (!url) {
     return { ok: false, error: "Could not prepare the download right now. Please try again." };
   }
-
-  const extension = design.storage_path.split(".").pop() || "png";
-  const filename = `${design.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.${extension}`;
 
   return { ok: true, data: { url, filename } };
 }
