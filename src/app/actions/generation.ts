@@ -9,6 +9,7 @@ import {
   deleteDesign,
   GenerationServiceError,
 } from "@/lib/generation/generation-service";
+import { DesignStorage } from "@/lib/storage/design-storage";
 import { startGenerationSchema, designIdSchema } from "@/lib/validations/generation";
 import type { ActionResult } from "@/app/actions/projects";
 
@@ -60,6 +61,46 @@ export async function retryDesignAction(input: unknown): Promise<ActionResult> {
     }
     return { ok: false, error: "Could not retry the design. Please try again." };
   }
+}
+
+/**
+ * Real, stored designs only — a signed URL scoped to the requesting
+ * user's own ownership-verified row, generated fresh on every call and
+ * never persisted. Mock designs (no storage_path) are rejected here; the
+ * UI never offers this action for them in the first place.
+ */
+export async function getDesignDownloadUrlAction(input: unknown): Promise<ActionResult<{ url: string; filename: string }>> {
+  const parsed = designIdSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error, "Invalid design.") };
+  }
+
+  const { supabase, user } = await requireUser();
+
+  const { data: design, error } = await supabase
+    .from("designs")
+    .select("id, storage_path, title")
+    .eq("id", parsed.data.id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (error || !design) {
+    return { ok: false, error: "Design not found." };
+  }
+  if (!design.storage_path) {
+    return { ok: false, error: "This is a mock development preview — there's no real file to download yet." };
+  }
+
+  const storage = new DesignStorage(supabase);
+  const url = await storage.createSignedUrl(design.storage_path, 300);
+  if (!url) {
+    return { ok: false, error: "Could not prepare the download right now. Please try again." };
+  }
+
+  const extension = design.storage_path.split(".").pop() || "png";
+  const filename = `${design.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.${extension}`;
+
+  return { ok: true, data: { url, filename } };
 }
 
 export async function deleteDesignAction(input: unknown): Promise<ActionResult> {

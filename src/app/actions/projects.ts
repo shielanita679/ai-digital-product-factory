@@ -10,6 +10,7 @@ import {
   setProjectArchivedSchema,
 } from "@/lib/validations/project";
 import { wizardConfigSchema } from "@/lib/validations/wizard";
+import { cleanupProjectStorage } from "@/lib/generation/generation-service";
 import type { Project } from "@/types/supabase";
 
 export type ActionResult<T = undefined> =
@@ -186,6 +187,12 @@ export async function deleteProjectAction(input: unknown): Promise<ActionResult>
   }
 
   const { supabase, user } = await requireUser();
+
+  // Best-effort Storage cleanup before the database cascade — see
+  // cleanupProjectStorage's doc comment for why this can't be a hard
+  // all-or-nothing guarantee and why that's an acceptable, documented
+  // limitation rather than blocking the user's delete on it.
+  await cleanupProjectStorage({ supabase, userId: user.id }, parsed.data.id);
 
   const { error } = await supabase
     .from("projects")

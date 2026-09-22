@@ -25,7 +25,7 @@ describe("MockImageProvider", () => {
     const provider = new MockImageProvider();
     const result = await provider.generate(makeInput());
     expect(result.ok).toBe(true);
-    if (result.ok) {
+    if (result.ok && result.source === "inline") {
       expect(result.imageUrl.startsWith("data:image/svg+xml;base64,")).toBe(true);
       expect(result.mimeType).toBe("image/svg+xml");
     }
@@ -36,7 +36,7 @@ describe("MockImageProvider", () => {
     const a = await provider.generate(makeInput({ variationIndex: 0, seed: "p:j:0" }));
     const b = await provider.generate(makeInput({ variationIndex: 1, seed: "p:j:1" }));
     expect(a.ok && b.ok).toBe(true);
-    if (a.ok && b.ok) {
+    if (a.ok && b.ok && a.source === "inline" && b.source === "inline") {
       expect(a.imageUrl).not.toBe(b.imageUrl);
       expect(a.providerGenerationId).not.toBe(b.providerGenerationId);
     }
@@ -114,8 +114,10 @@ describe("MockImageProvider", () => {
     }
   });
 
-  it("declares negative-prompt support", () => {
+  it("declares its capabilities, including negative-prompt support", () => {
     const provider = new MockImageProvider();
-    expect(provider.supportsNegativePrompt).toBe(true);
+    expect(provider.capabilities.supportsNegativePrompt).toBe(true);
+    expect(provider.capabilities.supportsTransparentBackground).toBe(true);
+    expect(provider.capabilities.supportsAspectRatio).toBe(true);
   });
 });

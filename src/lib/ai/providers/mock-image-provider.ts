@@ -140,7 +140,16 @@ export type MockImageProviderOptions = {
 
 export class MockImageProvider implements ImageGenerationProvider {
   readonly name = "mock";
-  readonly supportsNegativePrompt = true;
+  readonly capabilities = {
+    supportsNegativePrompt: true,
+    // The mock renders its own checkerboard-vs-solid preview, so it can
+    // "honor" transparency/aspect intent perfectly by construction — real
+    // providers report their actual, narrower capabilities.
+    supportsTransparentBackground: true,
+    supportsAspectRatio: true,
+    supportsSeed: true,
+    supportsMultipleOutputs: false,
+  };
 
   constructor(private readonly options: MockImageProviderOptions = {}) {}
 
@@ -168,6 +177,7 @@ export class MockImageProvider implements ImageGenerationProvider {
 
     return {
       ok: true,
+      source: "inline",
       imageUrl: dataUri,
       thumbnailUrl: dataUri,
       width: input.dimensions.width,

@@ -240,6 +240,12 @@ export type Database = {
           error_message: string | null;
           prompt_engine_version: string;
           metadata: Json;
+          // Phase 6 — durable Supabase Storage identity for REAL (non-mock)
+          // designs. Null for Phase 5 mock designs, whose preview is a
+          // fully self-contained data: URI in image_url.
+          storage_bucket: string | null;
+          storage_path: string | null;
+          file_size_bytes: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -262,6 +268,9 @@ export type Database = {
           error_message?: string | null;
           prompt_engine_version?: string;
           metadata?: Json;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
+          file_size_bytes?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -284,6 +293,9 @@ export type Database = {
           error_message?: string | null;
           prompt_engine_version?: string;
           metadata?: Json;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
+          file_size_bytes?: number | null;
           created_at?: string;
           updated_at?: string;
         };

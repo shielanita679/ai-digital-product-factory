@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { DesignGallery } from "@/components/generation/design-gallery";
 import { createClient } from "@/lib/supabase/server";
 import { isMigrationNotAppliedError } from "@/lib/supabase/db-error";
+import { resolveDesignDisplayUrls } from "@/lib/storage/resolve-design-display-urls";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -65,14 +66,15 @@ export default async function DesignsPage({
       projectNameById[p.id] = p.name;
     }
   }
+  const displayUrlById = await resolveDesignDisplayUrls(supabase, designs ?? []);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Designs</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Every design generated across your products. Phase 5 uses a mock provider — these are
-          development previews, not final AI-generated artwork.
+          Every design generated across your products. Real AI-generated designs and development
+          Mock previews are both shown here, clearly labeled.
         </p>
       </div>
 
@@ -95,7 +97,12 @@ export default async function DesignsPage({
       </div>
 
       {designs && designs.length > 0 ? (
-        <DesignGallery designs={designs} showProjectNames projectNameById={projectNameById} />
+        <DesignGallery
+          designs={designs}
+          displayUrlById={displayUrlById}
+          showProjectNames
+          projectNameById={projectNameById}
+        />
       ) : (
         <EmptyState
           icon={Palette}

@@ -38,18 +38,36 @@ export type ImageGenerationInput = {
   seed: string;
 };
 
-export type ImageGenerationSuccess = {
+type ImageGenerationSuccessBase = {
   ok: true;
-  imageUrl: string;
-  thumbnailUrl: string;
   width: number;
   height: number;
   mimeType: string;
   /** Honest report of whether the *result* has a transparent background — never assumed true just because it was requested. */
   transparentBackgroundApplied: boolean;
   providerGenerationId: string;
+  /** Sanitized, non-sensitive fields only — never raw headers, keys, or full provider response bodies. */
   providerMetadata?: Record<string, unknown>;
 };
+
+export type ImageGenerationSuccess =
+  | (ImageGenerationSuccessBase & {
+      /** A provider (the mock) that produced a directly-usable, storage-free
+       *  representation on its own — no upload step needed. */
+      source: "inline";
+      imageUrl: string;
+      thumbnailUrl: string;
+    })
+  | (ImageGenerationSuccessBase & {
+      /** A real provider's raw image bytes, ready for the generation
+       *  service to upload to Supabase Storage. Providers that only return
+       *  a temporary remote URL are responsible for fetching and
+       *  validating it themselves (see `fetchProviderImage` in
+       *  `provider-http.ts`) so every provider gives the service the same
+       *  "bytes ready to store" contract. */
+      source: "bytes";
+      imageBytes: Buffer;
+    });
 
 export type ImageGenerationFailure = {
   ok: false;
@@ -60,14 +78,25 @@ export type ImageGenerationFailure = {
 export type ImageGenerationResult = ImageGenerationSuccess | ImageGenerationFailure;
 
 /**
+ * What a provider actually supports, so the generation service (and UI) can
+ * adapt without scattering vendor-specific conditionals everywhere.
+ */
+export type ProviderCapabilities = {
+  supportsNegativePrompt: boolean;
+  supportsTransparentBackground: boolean;
+  supportsAspectRatio: boolean;
+  supportsSeed: boolean;
+  supportsMultipleOutputs: boolean;
+};
+
+/**
  * The application depends only on this interface, never on a specific
- * vendor SDK. Swapping the mock provider for a real one in Phase 6 means
- * writing a new class that implements this and registering it in
+ * vendor SDK. Swapping the mock provider for a real one means writing a
+ * new class that implements this and registering it in
  * `provider-registry.ts` — nothing else in the app changes.
  */
 export interface ImageGenerationProvider {
   readonly name: string;
-  /** Some providers (and some models) don't accept a negative prompt at all. */
-  readonly supportsNegativePrompt: boolean;
+  readonly capabilities: ProviderCapabilities;
   generate(input: ImageGenerationInput): Promise<ImageGenerationResult>;
 }

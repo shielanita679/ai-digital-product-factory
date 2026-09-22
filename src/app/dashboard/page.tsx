@@ -11,6 +11,7 @@ import { ProjectCard } from "@/components/products/project-card";
 import { DesignCard } from "@/components/generation/design-card";
 import { createClient } from "@/lib/supabase/server";
 import { isMigrationNotAppliedError } from "@/lib/supabase/db-error";
+import { resolveDesignDisplayUrls } from "@/lib/storage/resolve-design-display-urls";
 import { getPlan } from "@/config/plans";
 
 export const metadata: Metadata = {
@@ -61,6 +62,7 @@ export default async function DashboardPage() {
   const recentProjects = projectsResult.data;
   const designsMigrationMissing = isMigrationNotAppliedError(recentDesignsResult.error);
   const recentDesigns = designsMigrationMissing ? [] : (recentDesignsResult.data ?? []);
+  const recentDesignsDisplayUrlById = await resolveDesignDisplayUrls(supabase, recentDesigns);
 
   const stats = [
     { label: "Credits remaining", value: "—", icon: Coins, note: "Coming soon" },
@@ -191,7 +193,11 @@ export default async function DashboardPage() {
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-3">
                 {recentDesigns.map((design) => (
-                  <DesignCard key={design.id} design={design} />
+                  <DesignCard
+                    key={design.id}
+                    design={design}
+                    displayUrl={recentDesignsDisplayUrlById.get(design.id) ?? null}
+                  />
                 ))}
               </CardContent>
             </Card>
