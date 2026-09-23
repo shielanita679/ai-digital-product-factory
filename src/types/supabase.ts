@@ -652,6 +652,107 @@ export type Database = {
           },
         ];
       };
+      // Phase 9 — listing generator + editor + license. Undefined at
+      // runtime (not just null/missing rows) if this migration hasn't
+      // been applied yet — code reading this table must degrade
+      // gracefully, exactly like every other post-Phase-4 table.
+      product_listings: {
+        Row: {
+          id: string;
+          user_id: string;
+          project_id: string;
+          bundle_id: string;
+          marketplace: string;
+          status: string;
+          title: string | null;
+          description: string | null;
+          tags: Json;
+          materials: Json;
+          included_files: Json;
+          seo_keywords: Json;
+          license_type: string | null;
+          license_text: string | null;
+          license_edited: boolean;
+          generation_provider: string | null;
+          generation_model: string | null;
+          generation_version: number;
+          error_message: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          project_id: string;
+          bundle_id: string;
+          marketplace?: string;
+          status?: string;
+          title?: string | null;
+          description?: string | null;
+          tags?: Json;
+          materials?: Json;
+          included_files?: Json;
+          seo_keywords?: Json;
+          license_type?: string | null;
+          license_text?: string | null;
+          license_edited?: boolean;
+          generation_provider?: string | null;
+          generation_model?: string | null;
+          generation_version?: number;
+          error_message?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          project_id?: string;
+          bundle_id?: string;
+          marketplace?: string;
+          status?: string;
+          title?: string | null;
+          description?: string | null;
+          tags?: Json;
+          materials?: Json;
+          included_files?: Json;
+          seo_keywords?: Json;
+          license_type?: string | null;
+          license_text?: string | null;
+          license_edited?: boolean;
+          generation_provider?: string | null;
+          generation_model?: string | null;
+          generation_version?: number;
+          error_message?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "product_listings_bundle_id_fkey";
+            columns: ["bundle_id"];
+            isOneToOne: false;
+            referencedRelation: "product_bundles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "product_listings_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "product_listings_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -668,3 +769,4 @@ export type Vectorization = Database["public"]["Tables"]["vectorizations"]["Row"
 export type ProductBundle = Database["public"]["Tables"]["product_bundles"]["Row"];
 export type BundleItem = Database["public"]["Tables"]["bundle_items"]["Row"];
 export type Mockup = Database["public"]["Tables"]["mockups"]["Row"];
+export type ProductListing = Database["public"]["Tables"]["product_listings"]["Row"];

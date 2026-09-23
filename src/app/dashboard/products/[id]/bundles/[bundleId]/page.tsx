@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { isMigrationNotAppliedError } from "@/lib/supabase/db-error";
 import { resolveDesignDisplayUrls } from "@/lib/storage/resolve-design-display-urls";
 import { resolveVectorizationsForDesigns } from "@/lib/vector/vectorize-service";
 import { resolveMockupDisplayUrls } from "@/lib/bundles/mockup-service";
 import { MockupStorage } from "@/lib/storage/mockup-storage";
 import { BundleDetail } from "@/components/bundles/bundle-detail";
+import { ListingLicenseSection } from "@/components/listings/listing-license-section";
 
 export async function generateMetadata({
   params,
@@ -53,17 +55,30 @@ export default async function BundleDetailPage({
     coverUrl = await storage.createSignedUrl(bundle.cover_storage_path);
   }
 
+  // Phase 9 — queried separately so a not-yet-applied Phase 9 migration
+  // degrades gracefully instead of breaking the whole page.
+  const { data: listingsData, error: listingsError } = await supabase.from("product_listings").select("*").eq("bundle_id", bundleId);
+  const listingsMigrationApplied = !isMigrationNotAppliedError(listingsError);
+  const listings = listingsMigrationApplied ? (listingsData ?? []) : [];
+
   return (
-    <BundleDetail
-      project={project}
-      bundle={bundle}
-      designs={designs ?? []}
-      bundleItems={bundleItems ?? []}
-      mockups={mockups ?? []}
-      displayUrlById={displayUrlById}
-      vectorizationByDesignId={vectorizationByDesignId}
-      mockupDisplayUrlById={mockupDisplayUrlById}
-      coverUrl={coverUrl}
-    />
+    <div className="flex flex-col gap-6">
+      <BundleDetail
+        project={project}
+        bundle={bundle}
+        designs={designs ?? []}
+        bundleItems={bundleItems ?? []}
+        mockups={mockups ?? []}
+        displayUrlById={displayUrlById}
+        vectorizationByDesignId={vectorizationByDesignId}
+        mockupDisplayUrlById={mockupDisplayUrlById}
+        coverUrl={coverUrl}
+      />
+      {listingsMigrationApplied && (
+        <div className="mx-auto w-full max-w-4xl">
+          <ListingLicenseSection bundleId={bundleId} listings={listings} />
+        </div>
+      )}
+    </div>
   );
 }
