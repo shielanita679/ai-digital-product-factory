@@ -85,10 +85,18 @@ function renderMockVectorSvg(input: { seed: string; aspectRatio: number }): stri
   const cx = width / 2;
   const cy = height / 2;
 
+  // Unsigned right shift (`>>>`), not `>>`: `hash` can exceed 2^31 (it's
+  // forced unsigned via `>>> 0` in hashString), and a signed `>>` on such
+  // a value first reinterprets it as a negative 32-bit int, producing a
+  // negative shift result and therefore a negative `% PALETTE.length`
+  // remainder (JS modulo keeps the dividend's sign) — silently indexing
+  // PALETTE with a negative number, which returns `undefined`, which
+  // then serialized into the SVG as a literal `fill="undefined"`. Found
+  // via a live Phase 7 vectorization run.
   const blobColor = PALETTE[hash % PALETTE.length];
-  const circleColor = PALETTE[(hash >> 3) % PALETTE.length];
-  const rectColor = PALETTE[(hash >> 6) % PALETTE.length];
-  const polyColor = PALETTE[(hash >> 9) % PALETTE.length];
+  const circleColor = PALETTE[(hash >>> 3) % PALETTE.length];
+  const rectColor = PALETTE[(hash >>> 6) % PALETTE.length];
+  const polyColor = PALETTE[(hash >>> 9) % PALETTE.length];
 
   const blobRadius = Math.min(width, height) * 0.24;
   const blobPath = buildBlobPath(cx, cy, blobRadius, rng);
