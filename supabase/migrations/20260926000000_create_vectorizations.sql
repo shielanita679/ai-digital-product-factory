@@ -124,6 +124,31 @@ alter table public.vectorizations enable row level security;
 -- changes such that design_id or project_id can be legitimately absent
 -- or reassigned, this check must be reconsidered deliberately, not
 -- dropped for convenience.
+--
+-- CRITICAL — every reference to the row-being-written's OWN columns
+-- inside the EXISTS(...) subquery below MUST be qualified as
+-- `vectorizations.user_id` / `vectorizations.design_id` /
+-- `vectorizations.project_id`, never left bare. public.designs ALSO has
+-- columns literally named user_id and project_id, and inside a
+-- correlated subquery Postgres resolves an UNQUALIFIED identifier
+-- against the subquery's OWN FROM-list (designs d) first — before ever
+-- considering the outer row. A bare `and d.project_id = project_id`
+-- therefore silently becomes `d.project_id = d.project_id`, a tautology
+-- that is always true regardless of what project_id was actually
+-- submitted. This is not hypothetical: an earlier, unqualified version
+-- of this exact check was applied live and empirically confirmed to
+-- let an authenticated user attach their OWN design to ANOTHER user's
+-- project_id (user_id and design_id ownership were still enforced
+-- correctly — design_id has no name collision with any designs column,
+-- so it happened to resolve outward correctly — but project_id, sharing
+-- a name with designs.project_id, silently shadowed and stopped
+-- constraining anything). The fix in
+-- 20260927000000_fix_vectorizations_relational_rls.sql corrects the
+-- already-applied live database; the fully-qualified form below is what
+-- a FRESH database gets from this file directly. Any future edit to
+-- these two policies must keep every outer-row reference qualified with
+-- `vectorizations.` — never reintroduce a bare `user_id`/`project_id`/
+-- `design_id` inside the EXISTS subquery.
 create policy "Users can view their own vectorizations"
   on public.vectorizations
   for select
@@ -133,28 +158,28 @@ create policy "Users can create their own vectorizations"
   on public.vectorizations
   for insert
   with check (
-    auth.uid() = user_id
+    auth.uid() = vectorizations.user_id
     and exists (
       select 1
       from public.designs d
-      where d.id = design_id
-        and d.user_id = user_id
-        and d.project_id = project_id
+      where d.id = vectorizations.design_id
+        and d.user_id = vectorizations.user_id
+        and d.project_id = vectorizations.project_id
     )
   );
 
 create policy "Users can update their own vectorizations"
   on public.vectorizations
   for update
-  using (auth.uid() = user_id)
+  using (auth.uid() = vectorizations.user_id)
   with check (
-    auth.uid() = user_id
+    auth.uid() = vectorizations.user_id
     and exists (
       select 1
       from public.designs d
-      where d.id = design_id
-        and d.user_id = user_id
-        and d.project_id = project_id
+      where d.id = vectorizations.design_id
+        and d.user_id = vectorizations.user_id
+        and d.project_id = vectorizations.project_id
     )
   );
 
