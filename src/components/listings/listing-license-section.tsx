@@ -65,6 +65,18 @@ function readEditedFlags(metadata: unknown): {
   };
 }
 
+/**
+ * Postgres/PostgREST give no row-order guarantee without an explicit
+ * ORDER BY (confirmed live: a later-created 'etsy' row sorted before an
+ * earlier 'generic' one), so `listings[0]` is not a reliable default — it
+ * could show a different marketplace tab on every page load. Always
+ * prefer 'generic' (the schema's own default marketplace) when it
+ * exists; only fall back to whatever IS present otherwise.
+ */
+export function pickDefaultMarketplace(listings: Pick<ProductListing, "marketplace">[]): MarketplaceId {
+  return (listings.find((l) => l.marketplace === "generic")?.marketplace ?? listings[0]?.marketplace ?? "generic") as MarketplaceId;
+}
+
 function TagEditor({
   label,
   tags,
@@ -158,6 +170,24 @@ type PendingConfirm =
   | { kind: "license"; licenseType: LicenseType }
   | null;
 
+/**
+ * The license-type <select> updates `licenseType` optimistically as soon as
+ * the user picks a value, before the server confirms it — so switching to a
+ * type that requires overwrite confirmation and then dismissing that dialog
+ * (Cancel, Escape, or backdrop click) must revert the displayed selection
+ * back to the listing's actual persisted type. Otherwise the dropdown keeps
+ * showing the cancelled choice even though nothing was saved. Returns the
+ * value to restore, or null when the dismissal isn't a license-type change
+ * (nothing to revert).
+ */
+export function licenseTypeToRestoreOnDismiss(
+  pendingConfirm: PendingConfirm,
+  persistedLicenseType: LicenseType | null | undefined,
+): LicenseType | "" | null {
+  if (pendingConfirm?.kind !== "license") return null;
+  return (persistedLicenseType as LicenseType) ?? "";
+}
+
 export function ListingLicenseSection({
   bundleId,
   listings,
@@ -165,9 +195,7 @@ export function ListingLicenseSection({
   bundleId: string;
   listings: ProductListing[];
 }) {
-  const [marketplace, setMarketplace] = React.useState<MarketplaceId>(
-    (listings[0]?.marketplace as MarketplaceId) ?? "generic",
-  );
+  const [marketplace, setMarketplace] = React.useState<MarketplaceId>(pickDefaultMarketplace(listings));
   const listing = listings.find((l) => l.marketplace === marketplace) ?? null;
 
   return (
@@ -359,10 +387,20 @@ function ListingBody({
         setPendingConfirm({ kind: "license", licenseType: type });
         return;
       }
+      setLicenseType((listing.license_type as LicenseType) ?? "");
       setError(result.error);
       return;
     }
     refresh();
+  }
+
+  function closePendingConfirm() {
+    const restore = licenseTypeToRestoreOnDismiss(
+      pendingConfirm,
+      listing?.license_type as LicenseType | null,
+    );
+    if (restore !== null) setLicenseType(restore);
+    setPendingConfirm(null);
   }
 
   async function handleSaveLicenseText() {
@@ -698,7 +736,7 @@ function ListingBody({
 
       <Dialog
         open={!!pendingConfirm}
-        onOpenChange={(open) => !open && setPendingConfirm(null)}
+        onOpenChange={(open) => !open && closePendingConfirm()}
       >
         <DialogContent>
           <DialogHeader>
@@ -716,7 +754,7 @@ function ListingBody({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setPendingConfirm(null)}
+              onClick={closePendingConfirm}
             >
               Cancel
             </Button>

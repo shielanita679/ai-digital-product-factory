@@ -57,7 +57,11 @@ export default async function BundleDetailPage({
 
   // Phase 9 — queried separately so a not-yet-applied Phase 9 migration
   // degrades gracefully instead of breaking the whole page.
-  const { data: listingsData, error: listingsError } = await supabase.from("product_listings").select("*").eq("bundle_id", bundleId);
+  const { data: listingsData, error: listingsError } = await supabase
+    .from("product_listings")
+    .select("*")
+    .eq("bundle_id", bundleId)
+    .order("created_at", { ascending: true });
   const listingsMigrationApplied = !isMigrationNotAppliedError(listingsError);
   const listings = listingsMigrationApplied ? (listingsData ?? []) : [];
 
