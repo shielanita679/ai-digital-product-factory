@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   DatabaseZap,
-  ImageIcon,
   FileText,
   PackageCheck,
   Palette,
@@ -19,6 +18,7 @@ import { DesignGallery } from "@/components/generation/design-gallery";
 import { resolveDesignDisplayUrls } from "@/lib/storage/resolve-design-display-urls";
 import { resolveVectorDisplayUrls } from "@/lib/storage/resolve-vector-display-urls";
 import { resolveVectorizationsForDesigns } from "@/lib/vector/vectorize-service";
+import { BundleListSection } from "@/components/bundles/bundle-list-section";
 import { productTypeLabel, projectStatusLabel, projectStatusMeta } from "@/config/product-types";
 import { styleOptions } from "@/config/styles";
 import { audienceOptions } from "@/config/audiences";
@@ -54,7 +54,6 @@ export async function generateMetadata({
 }
 
 const futureSections = [
-  { icon: ImageIcon, title: "Mockups", description: "Product mockups (t-shirts, mugs, posters, and more) will appear here." },
   { icon: FileText, title: "Listing", description: "Generated title, description, tags, and pricing will appear here." },
   { icon: PackageCheck, title: "Package", description: "The final downloadable ZIP package will appear here." },
 ];
@@ -113,6 +112,16 @@ export default async function ProductDetailPage({
   const displayUrlById = await resolveDesignDisplayUrls(supabase, designs);
   const vectorizationByDesignId = await resolveVectorizationsForDesigns(supabase, designs.map((d) => d.id));
   const vectorPreviewUrlByVectorizationId = await resolveVectorDisplayUrls(supabase, Array.from(vectorizationByDesignId.values()));
+
+  // Phase 8 — queried separately so a not-yet-applied Phase 8 migration
+  // degrades gracefully instead of breaking the whole page.
+  const { data: bundlesData, error: bundlesError } = await supabase
+    .from("product_bundles")
+    .select("*")
+    .eq("project_id", project.id)
+    .order("created_at", { ascending: false });
+  const bundlesMigrationApplied = !isMigrationNotAppliedError(bundlesError);
+  const bundles = bundlesMigrationApplied ? (bundlesData ?? []) : [];
 
   const statusMeta = projectStatusMeta[project.status as keyof typeof projectStatusMeta];
 
@@ -300,6 +309,10 @@ export default async function ProductDetailPage({
             )}
           </div>
         </div>
+      )}
+
+      {bundlesMigrationApplied && (
+        <BundleListSection projectId={project.id} bundles={bundles} />
       )}
 
       <div>

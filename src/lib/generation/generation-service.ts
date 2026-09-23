@@ -518,7 +518,21 @@ export async function deleteDesign(ctx: GenerationContext, designId: string): Pr
     .eq("design_id", designId)
     .maybeSingle();
 
-  const storagePaths = [design.storage_path, vectorization?.storage_path].filter((p): p is string => !!p);
+  // Phase 8: a design may also be the source of one or more mockups
+  // (across different bundles) — same reasoning as the vectorization
+  // above: `mockups` cascades away at the DB level, but each mockup's
+  // Storage object does not, and must be removed here. Comes back empty
+  // (not an error) both when there are genuinely none and before the
+  // Phase 8 migration is applied.
+  const { data: mockups } = await ctx.supabase
+    .from("mockups")
+    .select("storage_path")
+    .eq("design_id", designId)
+    .not("storage_path", "is", null);
+
+  const storagePaths = [design.storage_path, vectorization?.storage_path, ...(mockups ?? []).map((m) => m.storage_path)].filter(
+    (p): p is string => !!p,
+  );
 
   if (storagePaths.length > 0) {
     const storage = new DesignStorage(ctx.supabase);
@@ -579,9 +593,32 @@ export async function cleanupProjectStorage(ctx: GenerationContext, projectId: s
     .eq("user_id", ctx.userId)
     .not("storage_path", "is", null);
 
-  const paths = [...(designs ?? []), ...(vectorizations ?? [])]
-    .map((row) => row.storage_path)
-    .filter((p): p is string => !!p);
+  // Phase 8: mockups and bundle covers live in the same bucket under the
+  // same project-owned prefixes and need the same explicit cleanup —
+  // Postgres's cascade (via product_bundles.project_id / mockups.project_id)
+  // only removes the DB rows, not their Storage objects. Both queries
+  // simply come back empty (not an error) before the Phase 8 migration
+  // is applied.
+  const { data: mockups } = await ctx.supabase
+    .from("mockups")
+    .select("storage_path")
+    .eq("project_id", projectId)
+    .eq("user_id", ctx.userId)
+    .not("storage_path", "is", null);
+
+  const { data: bundles } = await ctx.supabase
+    .from("product_bundles")
+    .select("cover_storage_path")
+    .eq("project_id", projectId)
+    .eq("user_id", ctx.userId)
+    .not("cover_storage_path", "is", null);
+
+  const paths = [
+    ...(designs ?? []).map((row) => row.storage_path),
+    ...(vectorizations ?? []).map((row) => row.storage_path),
+    ...(mockups ?? []).map((row) => row.storage_path),
+    ...(bundles ?? []).map((row) => row.cover_storage_path),
+  ].filter((p): p is string => !!p);
   if (paths.length === 0) return;
 
   const storage = new DesignStorage(ctx.supabase);

@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { deleteDesign, cleanupProjectStorage, GenerationServiceError } from "@/lib/generation/generation-service";
 
 type Row = Record<string, unknown>;
-type Db = { designs: Row[]; vectorizations: Row[]; projects: Row[] };
+type Db = { designs: Row[]; vectorizations: Row[]; projects: Row[]; mockups: Row[]; product_bundles: Row[] };
 
 /**
  * A minimal in-memory fake scoped to exactly the query shapes deleteDesign
@@ -93,6 +93,8 @@ describe("deleteDesign — Phase 7 vector cleanup", () => {
       designs: [{ id: "d1", user_id: "u1", project_id: "p1", storage_path: "u1/p1/d1/original.png" }],
       vectorizations: [{ id: "v1", design_id: "d1", storage_path: "u1/p1/d1/vector.svg" }],
       projects: [{ id: "p1", design_count: 1 }],
+      mockups: [],
+      product_bundles: [],
     };
     const supabase = makeFakeSupabase(db, removeSpy);
 
@@ -108,6 +110,8 @@ describe("deleteDesign — Phase 7 vector cleanup", () => {
       designs: [{ id: "d1", user_id: "u1", project_id: "p1", storage_path: "u1/p1/d1/original.png" }],
       vectorizations: [],
       projects: [{ id: "p1", design_count: 1 }],
+      mockups: [],
+      product_bundles: [],
     };
     const supabase = makeFakeSupabase(db, removeSpy);
 
@@ -123,11 +127,37 @@ describe("deleteDesign — Phase 7 vector cleanup", () => {
       designs: [{ id: "d1", user_id: "u1", project_id: "p1", storage_path: "u1/p1/d1/original.png" }],
       vectorizations: [{ id: "v1", design_id: "d1", storage_path: "u1/p1/d1/vector.svg" }],
       projects: [{ id: "p1", design_count: 1 }],
+      mockups: [],
+      product_bundles: [],
     };
     const supabase = makeFakeSupabase(db, removeSpy);
 
     await expect(deleteDesign({ supabase, userId: "u1" }, "d1")).rejects.toBeInstanceOf(GenerationServiceError);
     expect(db.designs).toHaveLength(1);
+  });
+
+  it("Phase 8: also deletes any mockup Storage objects generated from this design", async () => {
+    const removeSpy = vi.fn(async (paths: string[]) => ({ data: paths.map((name) => ({ name })), error: null }));
+    const db: Db = {
+      designs: [{ id: "d1", user_id: "u1", project_id: "p1", storage_path: "u1/p1/d1/original.png" }],
+      vectorizations: [],
+      projects: [{ id: "p1", design_count: 1 }],
+      mockups: [
+        { id: "m1", design_id: "d1", storage_path: "u1/p1/bundles/b1/mockups/m1.png" },
+        { id: "m2", design_id: "d1", storage_path: "u1/p1/bundles/b1/mockups/m2.png" },
+      ],
+      product_bundles: [],
+    };
+    const supabase = makeFakeSupabase(db, removeSpy);
+
+    await deleteDesign({ supabase, userId: "u1" }, "d1");
+
+    expect(removeSpy).toHaveBeenCalledWith([
+      "u1/p1/d1/original.png",
+      "u1/p1/bundles/b1/mockups/m1.png",
+      "u1/p1/bundles/b1/mockups/m2.png",
+    ]);
+    expect(db.designs).toHaveLength(0);
   });
 });
 
@@ -141,6 +171,8 @@ describe("cleanupProjectStorage — Phase 7 vector cleanup", () => {
       ],
       vectorizations: [{ id: "v1", user_id: "u1", project_id: "p1", storage_path: "u1/p1/d1/vector.svg" }],
       projects: [{ id: "p1" }],
+      mockups: [],
+      product_bundles: [],
     };
     const supabase = makeFakeSupabase(db, removeSpy);
 
@@ -151,11 +183,27 @@ describe("cleanupProjectStorage — Phase 7 vector cleanup", () => {
 
   it("is a no-op when the project has no stored raster or vector objects", async () => {
     const removeSpy = vi.fn(async (paths: string[]) => ({ data: paths.map((name) => ({ name })), error: null }));
-    const db: Db = { designs: [], vectorizations: [], projects: [{ id: "p1" }] };
+    const db: Db = { designs: [], vectorizations: [], projects: [{ id: "p1" }], mockups: [], product_bundles: [] };
     const supabase = makeFakeSupabase(db, removeSpy);
 
     await cleanupProjectStorage({ supabase, userId: "u1" }, "p1");
 
     expect(removeSpy).not.toHaveBeenCalled();
+  });
+
+  it("Phase 8: also deletes mockup Storage objects and bundle cover Storage objects across the whole project", async () => {
+    const removeSpy = vi.fn(async (paths: string[]) => ({ data: paths.map((name) => ({ name })), error: null }));
+    const db: Db = {
+      designs: [],
+      vectorizations: [],
+      projects: [{ id: "p1" }],
+      mockups: [{ id: "m1", user_id: "u1", project_id: "p1", storage_path: "u1/p1/bundles/b1/mockups/m1.png" }],
+      product_bundles: [{ id: "b1", user_id: "u1", project_id: "p1", cover_storage_path: "u1/p1/bundles/b1/cover.png" }],
+    };
+    const supabase = makeFakeSupabase(db, removeSpy);
+
+    await cleanupProjectStorage({ supabase, userId: "u1" }, "p1");
+
+    expect(removeSpy).toHaveBeenCalledWith(["u1/p1/bundles/b1/mockups/m1.png", "u1/p1/bundles/b1/cover.png"]);
   });
 });
