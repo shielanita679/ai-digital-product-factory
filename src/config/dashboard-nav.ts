@@ -26,7 +26,7 @@ export const dashboardNav: DashboardNavItem[] = [
   { label: "My Products", href: "/dashboard/products", icon: FolderKanban },
   { label: "Designs", href: "/dashboard/designs", icon: Palette },
   { label: "Mockups", href: "/dashboard/mockups", icon: ImageIcon, comingSoon: true },
-  { label: "Downloads", href: "/dashboard/downloads", icon: Download, comingSoon: true },
+  { label: "Downloads", href: "/dashboard/downloads", icon: Download },
   { label: "Templates", href: "/dashboard/templates", icon: LayoutTemplate, comingSoon: true },
   { label: "Credits", href: "/dashboard/credits", icon: Coins, comingSoon: true },
   { label: "Billing", href: "/dashboard/billing", icon: CreditCard, comingSoon: true },

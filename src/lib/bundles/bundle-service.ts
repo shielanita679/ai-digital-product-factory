@@ -217,17 +217,22 @@ export async function generateBundleCover(ctx: BundleContext, bundleId: string):
 
 /**
  * Storage-first delete (mirrors deleteDesign/cleanupProjectStorage in
- * generation-service.ts): the cover and every mockup's Storage object
- * are removed BEFORE the bundle row, so a Storage failure never leaves
- * an orphan with nothing left to find it — the row stays if any object
- * fails to delete, exactly like the Phase 7 delete pattern.
+ * generation-service.ts): the cover, every mockup's Storage object, and
+ * (Phase 10) any built package ZIP(s) are removed BEFORE the bundle row,
+ * so a Storage failure never leaves an orphan with nothing left to find
+ * it — the row stays if any object fails to delete, exactly like the
+ * Phase 7 delete pattern. product_packages rows themselves cascade away
+ * at the DB level via bundle_id's FK once the bundle row is deleted below,
+ * but — exactly like mockups/cover — their Storage ZIP object does not,
+ * and must be removed here first.
  */
 export async function deleteBundle(ctx: BundleContext, bundleId: string): Promise<{ projectId: string }> {
   const bundle = await loadOwnedBundle(ctx, bundleId);
 
   const { data: mockups } = await ctx.supabase.from("mockups").select("storage_path").eq("bundle_id", bundleId).eq("user_id", ctx.userId).not("storage_path", "is", null);
+  const { data: packages } = await ctx.supabase.from("product_packages").select("storage_path").eq("bundle_id", bundleId).eq("user_id", ctx.userId).not("storage_path", "is", null);
 
-  const paths = [bundle.cover_storage_path, ...(mockups ?? []).map((m) => m.storage_path)].filter((p): p is string => !!p);
+  const paths = [bundle.cover_storage_path, ...(mockups ?? []).map((m) => m.storage_path), ...(packages ?? []).map((p) => p.storage_path)].filter((p): p is string => !!p);
 
   if (paths.length > 0) {
     const storage = new MockupStorage(ctx.supabase);

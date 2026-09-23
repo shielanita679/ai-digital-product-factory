@@ -635,11 +635,24 @@ export async function cleanupProjectStorage(ctx: GenerationContext, projectId: s
     .eq("user_id", ctx.userId)
     .not("cover_storage_path", "is", null);
 
+  // Phase 10: package ZIPs live in the same bucket under the same
+  // project-owned prefixes and need the same explicit cleanup — the
+  // product_packages DB rows cascade away via project_id's FK, but their
+  // Storage ZIP object does not. Comes back empty (not an error) before
+  // the Phase 10 migration is applied.
+  const { data: packages } = await ctx.supabase
+    .from("product_packages")
+    .select("storage_path")
+    .eq("project_id", projectId)
+    .eq("user_id", ctx.userId)
+    .not("storage_path", "is", null);
+
   const paths = [
     ...(designs ?? []).map((row) => row.storage_path),
     ...(vectorizations ?? []).map((row) => row.storage_path),
     ...(mockups ?? []).map((row) => row.storage_path),
     ...(bundles ?? []).map((row) => row.cover_storage_path),
+    ...(packages ?? []).map((row) => row.storage_path),
   ].filter((p): p is string => !!p);
   if (paths.length === 0) return;
 

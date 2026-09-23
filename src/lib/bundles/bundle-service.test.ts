@@ -12,7 +12,7 @@ import {
 } from "@/lib/bundles/bundle-service";
 
 type Row = Record<string, unknown>;
-type Db = { projects: Row[]; designs: Row[]; vectorizations: Row[]; product_bundles: Row[]; bundle_items: Row[]; mockups: Row[] };
+type Db = { projects: Row[]; designs: Row[]; vectorizations: Row[]; product_bundles: Row[]; bundle_items: Row[]; mockups: Row[]; product_packages?: Row[] };
 
 let idCounter = 0;
 function genId(prefix: string) {
@@ -22,6 +22,9 @@ function genId(prefix: string) {
 
 /** Same in-memory fake-Supabase approach as vectorize-service.test.ts, extended with a minimal `designs(title)` embed for bundle_items (only what generateBundleCover actually needs). */
 function makeFakeSupabase(db: Db, storageOverrides: Record<string, unknown> = {}) {
+  // Phase 10: deleteBundle also queries product_packages — defaulted here
+  // so every pre-Phase-10 test fixture above doesn't need to list it.
+  db.product_packages = db.product_packages ?? [];
   function makeBuilder(op: "select" | "insert" | "update" | "delete" | "upsert", table: keyof Db, payload?: Row, selectCols?: string, countOnly = false) {
     const filters: Array<(row: Row) => boolean> = [];
     let mode: "list" | "single" | "maybeSingle" = "list";
@@ -56,6 +59,7 @@ function makeFakeSupabase(db: Db, storageOverrides: Record<string, unknown> = {}
     };
 
     async function execute() {
+      db[table] = db[table] ?? []; // Phase 10: product_packages is optional on Db so pre-Phase-10 fixtures don't need updating.
       if (op === "select") {
         let matched = db[table].filter((r) => filters.every((f) => f(r)));
         if (countOnly) return { data: null, error: null, count: matched.length };
@@ -315,5 +319,31 @@ describe("deleteBundle", () => {
     const supabase = makeFakeSupabase(db, { remove: vi.fn(async () => ({ data: [], error: null })) });
     await expect(deleteBundle({ supabase, userId: "user-1" }, "bundle-1")).rejects.toBeInstanceOf(BundleServiceError);
     expect(db.product_bundles).toHaveLength(1);
+  });
+
+  it("Phase 10: also deletes any built package ZIP(s) before the bundle row — DB cascade alone would orphan the Storage object", async () => {
+    const removeSpy = vi.fn(async (paths: string[]) => ({ data: paths.map((name) => ({ name })), error: null }));
+    const db: Db = {
+      projects: [],
+      designs: [],
+      vectorizations: [],
+      product_bundles: [{ id: "bundle-1", user_id: "user-1", project_id: "project-1", cover_storage_path: null }],
+      bundle_items: [],
+      mockups: [],
+      product_packages: [
+        { id: "pkg-generic", bundle_id: "bundle-1", user_id: "user-1", storage_path: "user-1/project-1/bundles/bundle-1/package/generic.zip" },
+        { id: "pkg-etsy", bundle_id: "bundle-1", user_id: "user-1", storage_path: "user-1/project-1/bundles/bundle-1/package/etsy.zip" },
+        { id: "pkg-never-built", bundle_id: "bundle-1", user_id: "user-1", storage_path: null },
+      ],
+    };
+    const supabase = makeFakeSupabase(db, { remove: removeSpy });
+
+    await deleteBundle({ supabase, userId: "user-1" }, "bundle-1");
+
+    expect(removeSpy).toHaveBeenCalledWith([
+      "user-1/project-1/bundles/bundle-1/package/generic.zip",
+      "user-1/project-1/bundles/bundle-1/package/etsy.zip",
+    ]);
+    expect(db.product_bundles).toHaveLength(0);
   });
 });

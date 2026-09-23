@@ -753,6 +753,95 @@ export type Database = {
           },
         ];
       };
+      // Phase 10 — ZIP packaging + download center. Undefined at runtime
+      // (not just null/missing rows) if this migration hasn't been applied
+      // yet — code reading this table must degrade gracefully, exactly
+      // like every other post-Phase-4 table.
+      product_packages: {
+        Row: {
+          id: string;
+          user_id: string;
+          project_id: string;
+          bundle_id: string;
+          marketplace: string;
+          status: string;
+          version: number;
+          storage_bucket: string | null;
+          storage_path: string | null;
+          file_name: string | null;
+          file_size_bytes: number | null;
+          checksum_sha256: string | null;
+          item_count: number;
+          manifest: Json;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          project_id: string;
+          bundle_id: string;
+          marketplace?: string;
+          status?: string;
+          version?: number;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
+          file_name?: string | null;
+          file_size_bytes?: number | null;
+          checksum_sha256?: string | null;
+          item_count?: number;
+          manifest?: Json;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          project_id?: string;
+          bundle_id?: string;
+          marketplace?: string;
+          status?: string;
+          version?: number;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
+          file_name?: string | null;
+          file_size_bytes?: number | null;
+          checksum_sha256?: string | null;
+          item_count?: number;
+          manifest?: Json;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "product_packages_bundle_id_fkey";
+            columns: ["bundle_id"];
+            isOneToOne: false;
+            referencedRelation: "product_bundles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "product_packages_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "product_packages_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -770,3 +859,4 @@ export type ProductBundle = Database["public"]["Tables"]["product_bundles"]["Row
 export type BundleItem = Database["public"]["Tables"]["bundle_items"]["Row"];
 export type Mockup = Database["public"]["Tables"]["mockups"]["Row"];
 export type ProductListing = Database["public"]["Tables"]["product_listings"]["Row"];
+export type ProductPackage = Database["public"]["Tables"]["product_packages"]["Row"];

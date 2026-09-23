@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { deleteDesign, cleanupProjectStorage, GenerationServiceError } from "@/lib/generation/generation-service";
 
 type Row = Record<string, unknown>;
-type Db = { designs: Row[]; vectorizations: Row[]; projects: Row[]; mockups: Row[]; product_bundles: Row[]; bundle_items: Row[] };
+type Db = { designs: Row[]; vectorizations: Row[]; projects: Row[]; mockups: Row[]; product_bundles: Row[]; bundle_items: Row[]; product_packages?: Row[] };
 
 /**
  * A minimal in-memory fake scoped to exactly the query shapes deleteDesign
@@ -43,6 +43,7 @@ function makeFakeSupabase(db: Db, removeSpy: ReturnType<typeof vi.fn>) {
     };
 
     async function execute() {
+      db[table] = db[table] ?? []; // Phase 10: product_packages is optional on Db so pre-Phase-10 fixtures don't need updating.
       if (op === "select") {
         const matched = db[table].filter((r) => filters.every((f) => f(r)));
         if (mode === "single") {
@@ -260,5 +261,27 @@ describe("cleanupProjectStorage — Phase 7 vector cleanup", () => {
     await cleanupProjectStorage({ supabase, userId: "u1" }, "p1");
 
     expect(removeSpy).toHaveBeenCalledWith(["u1/p1/bundles/b1/mockups/m1.png", "u1/p1/bundles/b1/cover.png"]);
+  });
+
+  it("Phase 10: also deletes built package ZIP Storage objects across the whole project", async () => {
+    const removeSpy = vi.fn(async (paths: string[]) => ({ data: paths.map((name) => ({ name })), error: null }));
+    const db: Db = {
+      designs: [],
+      vectorizations: [],
+      projects: [{ id: "p1" }],
+      mockups: [],
+      product_bundles: [],
+      bundle_items: [],
+      product_packages: [
+        { id: "pkg1", user_id: "u1", project_id: "p1", storage_path: "u1/p1/bundles/b1/package/generic.zip" },
+        { id: "pkg2", user_id: "u1", project_id: "p1", storage_path: "u1/p1/bundles/b1/package/etsy.zip" },
+        { id: "pkg3", user_id: "u1", project_id: "p1", storage_path: null },
+      ],
+    };
+    const supabase = makeFakeSupabase(db, removeSpy);
+
+    await cleanupProjectStorage({ supabase, userId: "u1" }, "p1");
+
+    expect(removeSpy).toHaveBeenCalledWith(["u1/p1/bundles/b1/package/generic.zip", "u1/p1/bundles/b1/package/etsy.zip"]);
   });
 });

@@ -9,6 +9,7 @@ import { resolveMockupDisplayUrls } from "@/lib/bundles/mockup-service";
 import { MockupStorage } from "@/lib/storage/mockup-storage";
 import { BundleDetail } from "@/components/bundles/bundle-detail";
 import { ListingLicenseSection } from "@/components/listings/listing-license-section";
+import { BundlePackageSection } from "@/components/packages/bundle-package-section";
 
 export async function generateMetadata({
   params,
@@ -65,6 +66,15 @@ export default async function BundleDetailPage({
   const listingsMigrationApplied = !isMigrationNotAppliedError(listingsError);
   const listings = listingsMigrationApplied ? (listingsData ?? []) : [];
 
+  // Phase 10 — queried separately so a not-yet-applied Phase 10 migration
+  // degrades gracefully instead of breaking the whole page.
+  const { data: packagesData, error: packagesError } = await supabase
+    .from("product_packages")
+    .select("*")
+    .eq("bundle_id", bundleId);
+  const packagesMigrationApplied = !isMigrationNotAppliedError(packagesError);
+  const packages = packagesMigrationApplied ? (packagesData ?? []) : [];
+
   return (
     <div className="flex flex-col gap-6">
       <BundleDetail
@@ -81,6 +91,11 @@ export default async function BundleDetailPage({
       {listingsMigrationApplied && (
         <div className="mx-auto w-full max-w-4xl">
           <ListingLicenseSection bundleId={bundleId} listings={listings} />
+        </div>
+      )}
+      {packagesMigrationApplied && (
+        <div className="mx-auto w-full max-w-4xl">
+          <BundlePackageSection bundleId={bundleId} packages={packages} />
         </div>
       )}
     </div>
