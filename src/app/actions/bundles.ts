@@ -46,8 +46,8 @@ export async function renameBundleAction(input: unknown): Promise<ActionResult> 
 
   const { supabase, user } = await requireUser();
   try {
-    await renameBundle({ supabase, userId: user.id }, parsed.data.id, parsed.data.name);
-    revalidateBundlePaths();
+    const { projectId } = await renameBundle({ supabase, userId: user.id }, parsed.data.id, parsed.data.name);
+    revalidateBundlePaths(projectId, parsed.data.id);
     return { ok: true, data: undefined };
   } catch (err) {
     if (err instanceof BundleServiceError) return { ok: false, error: err.message };
@@ -61,11 +61,11 @@ export async function setBundleItemAction(input: unknown): Promise<ActionResult>
 
   const { supabase, user } = await requireUser();
   try {
-    await setBundleItem({ supabase, userId: user.id }, parsed.data.bundleId, parsed.data.designId, {
+    const { projectId } = await setBundleItem({ supabase, userId: user.id }, parsed.data.bundleId, parsed.data.designId, {
       includePng: parsed.data.includePng,
       includeSvg: parsed.data.includeSvg,
     });
-    revalidateBundlePaths();
+    revalidateBundlePaths(projectId, parsed.data.bundleId);
     return { ok: true, data: undefined };
   } catch (err) {
     if (err instanceof BundleServiceError) return { ok: false, error: err.message };
@@ -79,8 +79,8 @@ export async function removeBundleItemAction(input: unknown): Promise<ActionResu
 
   const { supabase, user } = await requireUser();
   try {
-    await removeBundleItem({ supabase, userId: user.id }, parsed.data.bundleId, parsed.data.designId);
-    revalidateBundlePaths();
+    const { projectId } = await removeBundleItem({ supabase, userId: user.id }, parsed.data.bundleId, parsed.data.designId);
+    revalidateBundlePaths(projectId, parsed.data.bundleId);
     return { ok: true, data: undefined };
   } catch (err) {
     if (err instanceof BundleServiceError) return { ok: false, error: err.message };
@@ -94,8 +94,8 @@ export async function generateBundleCoverAction(input: unknown): Promise<ActionR
 
   const { supabase, user } = await requireUser();
   try {
-    await generateBundleCover({ supabase, userId: user.id }, parsed.data.id);
-    revalidateBundlePaths();
+    const { projectId } = await generateBundleCover({ supabase, userId: user.id }, parsed.data.id);
+    revalidateBundlePaths(projectId, parsed.data.id);
     return { ok: true, data: undefined };
   } catch (err) {
     if (err instanceof BundleServiceError) return { ok: false, error: err.message };
@@ -109,8 +109,8 @@ export async function deleteBundleAction(input: unknown): Promise<ActionResult> 
 
   const { supabase, user } = await requireUser();
   try {
-    await deleteBundle({ supabase, userId: user.id }, parsed.data.id);
-    revalidateBundlePaths();
+    const { projectId } = await deleteBundle({ supabase, userId: user.id }, parsed.data.id);
+    revalidateBundlePaths(projectId, parsed.data.id);
     return { ok: true, data: undefined };
   } catch (err) {
     if (err instanceof BundleServiceError) return { ok: false, error: err.message };

@@ -13,6 +13,7 @@ import type { ProductType } from "@/config/product-types";
 import type { ContentMode, ColorMode, Orientation } from "@/config/design-options";
 import { isMigrationNotAppliedError, friendlyDbErrorMessage } from "@/lib/supabase/db-error";
 import { DesignStorage } from "@/lib/storage/design-storage";
+import { recomputeBundleItemCount, recomputeBundleMockupCount } from "@/lib/bundles/bundle-service";
 
 /**
  * The generation pipeline's "future async boundary": every function here
@@ -524,15 +525,27 @@ export async function deleteDesign(ctx: GenerationContext, designId: string): Pr
   // Storage object does not, and must be removed here. Comes back empty
   // (not an error) both when there are genuinely none and before the
   // Phase 8 migration is applied.
-  const { data: mockups } = await ctx.supabase
-    .from("mockups")
-    .select("storage_path")
-    .eq("design_id", designId)
-    .not("storage_path", "is", null);
+  const { data: mockups } = await ctx.supabase.from("mockups").select("bundle_id, storage_path").eq("design_id", designId);
 
-  const storagePaths = [design.storage_path, vectorization?.storage_path, ...(mockups ?? []).map((m) => m.storage_path)].filter(
-    (p): p is string => !!p,
-  );
+  // Phase 8: a design may also be selected into one or more bundles
+  // (bundle_items) with or without any mockups generated yet — gathered
+  // here, before the cascade removes these rows, so item_count/
+  // mockup_count on every affected bundle can be recomputed afterward.
+  // Without this, deleting a design that was part of a bundle would leave
+  // that bundle's denormalized counters silently stale (too high) even
+  // though the underlying bundle_items/mockups rows are correctly gone.
+  const { data: bundleItems } = await ctx.supabase.from("bundle_items").select("bundle_id").eq("design_id", designId);
+
+  const affectedBundleIds = new Set<string>([
+    ...(mockups ?? []).map((m) => m.bundle_id),
+    ...(bundleItems ?? []).map((b) => b.bundle_id),
+  ]);
+
+  const storagePaths = [
+    design.storage_path,
+    vectorization?.storage_path,
+    ...(mockups ?? []).map((m) => m.storage_path),
+  ].filter((p): p is string => !!p);
 
   if (storagePaths.length > 0) {
     const storage = new DesignStorage(ctx.supabase);
@@ -553,6 +566,15 @@ export async function deleteDesign(ctx: GenerationContext, designId: string): Pr
   }
 
   await recomputeProjectDesignCount(ctx.supabase, design.project_id);
+
+  // The design row's delete has now cascaded away this design's
+  // bundle_items/mockups rows — recompute every bundle those rows
+  // belonged to so item_count/mockup_count reflect reality, not a stale
+  // pre-deletion snapshot.
+  for (const bundleId of affectedBundleIds) {
+    await recomputeBundleItemCount(ctx.supabase, bundleId);
+    await recomputeBundleMockupCount(ctx.supabase, bundleId);
+  }
 }
 
 /**

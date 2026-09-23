@@ -11,8 +11,10 @@ function firstIssueMessage(error: { issues: { message: string }[] }, fallback: s
   return error.issues[0]?.message ?? fallback;
 }
 
-function revalidateMockupPaths() {
+function revalidateMockupPaths(projectId?: string, bundleId?: string) {
   revalidatePath("/dashboard");
+  if (projectId) revalidatePath(`/dashboard/products/${projectId}`);
+  if (projectId && bundleId) revalidatePath(`/dashboard/products/${projectId}/bundles/${bundleId}`);
 }
 
 export async function generateMockupsAction(
@@ -23,9 +25,9 @@ export async function generateMockupsAction(
 
   const { supabase, user } = await requireUser();
   try {
-    const result = await generateMockups({ supabase, userId: user.id }, parsed.data.bundleId, parsed.data.designId, parsed.data.templateTypes);
-    revalidateMockupPaths();
-    return { ok: true, data: result };
+    const { results, projectId } = await generateMockups({ supabase, userId: user.id }, parsed.data.bundleId, parsed.data.designId, parsed.data.templateTypes);
+    revalidateMockupPaths(projectId, parsed.data.bundleId);
+    return { ok: true, data: { results } };
   } catch (err) {
     if (err instanceof MockupServiceError) return { ok: false, error: err.message };
     return { ok: false, error: "Could not generate mockups. Please try again." };
@@ -38,8 +40,8 @@ export async function deleteMockupAction(input: unknown): Promise<ActionResult> 
 
   const { supabase, user } = await requireUser();
   try {
-    await deleteMockup({ supabase, userId: user.id }, parsed.data.id);
-    revalidateMockupPaths();
+    const { projectId, bundleId } = await deleteMockup({ supabase, userId: user.id }, parsed.data.id);
+    revalidateMockupPaths(projectId, bundleId);
     return { ok: true, data: undefined };
   } catch (err) {
     if (err instanceof MockupServiceError) return { ok: false, error: err.message };

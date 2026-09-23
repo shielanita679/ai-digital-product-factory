@@ -89,13 +89,14 @@ export async function createBundle(ctx: BundleContext, projectId: string, name: 
   return { bundleId: data.id };
 }
 
-export async function renameBundle(ctx: BundleContext, bundleId: string, name: string): Promise<void> {
-  await loadOwnedBundle(ctx, bundleId);
+export async function renameBundle(ctx: BundleContext, bundleId: string, name: string): Promise<{ projectId: string }> {
+  const bundle = await loadOwnedBundle(ctx, bundleId);
   const trimmed = name.trim();
   if (!trimmed) throw new BundleServiceError("Give this bundle a name.", "invalid_config");
 
   const { error } = await ctx.supabase.from("product_bundles").update({ name: trimmed }).eq("id", bundleId).eq("user_id", ctx.userId);
   if (error) throw new BundleServiceError(friendlyDbErrorMessage(error, "Could not rename the bundle."), "db_error");
+  return { projectId: bundle.project_id };
 }
 
 /**
@@ -109,7 +110,7 @@ export async function setBundleItem(
   bundleId: string,
   designId: string,
   formats: { includePng: boolean; includeSvg: boolean },
-): Promise<void> {
+): Promise<{ projectId: string }> {
   const bundle = await loadOwnedBundle(ctx, bundleId);
   const { design, vectorization } = await loadOwnedDesignWithVectorization(ctx, designId);
 
@@ -139,13 +140,15 @@ export async function setBundleItem(
   }
 
   await recomputeBundleItemCount(ctx.supabase, bundleId);
+  return { projectId: bundle.project_id };
 }
 
-export async function removeBundleItem(ctx: BundleContext, bundleId: string, designId: string): Promise<void> {
-  await loadOwnedBundle(ctx, bundleId);
+export async function removeBundleItem(ctx: BundleContext, bundleId: string, designId: string): Promise<{ projectId: string }> {
+  const bundle = await loadOwnedBundle(ctx, bundleId);
   const { error } = await ctx.supabase.from("bundle_items").delete().eq("bundle_id", bundleId).eq("design_id", designId).eq("user_id", ctx.userId);
   if (error) throw new BundleServiceError(friendlyDbErrorMessage(error, "Could not remove the design from the bundle."), "db_error");
   await recomputeBundleItemCount(ctx.supabase, bundleId);
+  return { projectId: bundle.project_id };
 }
 
 /** The single source of truth for product_bundles.item_count — a direct count, never incremented optimistically, mirroring recomputeProjectDesignCount() in generation-service.ts. */
@@ -168,7 +171,7 @@ export async function recomputeBundleMockupCount(supabase: SupabaseClient<Databa
  * row update. Never calls OpenAI or any paid provider (see
  * generateBundleCoverPng's own doc comment).
  */
-export async function generateBundleCover(ctx: BundleContext, bundleId: string): Promise<void> {
+export async function generateBundleCover(ctx: BundleContext, bundleId: string): Promise<{ projectId: string }> {
   const bundle = await loadOwnedBundle(ctx, bundleId);
 
   const { data: items, error } = await ctx.supabase
@@ -209,6 +212,7 @@ export async function generateBundleCover(ctx: BundleContext, bundleId: string):
       "storage_error",
     );
   }
+  return { projectId: bundle.project_id };
 }
 
 /**
@@ -218,7 +222,7 @@ export async function generateBundleCover(ctx: BundleContext, bundleId: string):
  * an orphan with nothing left to find it — the row stays if any object
  * fails to delete, exactly like the Phase 7 delete pattern.
  */
-export async function deleteBundle(ctx: BundleContext, bundleId: string): Promise<void> {
+export async function deleteBundle(ctx: BundleContext, bundleId: string): Promise<{ projectId: string }> {
   const bundle = await loadOwnedBundle(ctx, bundleId);
 
   const { data: mockups } = await ctx.supabase.from("mockups").select("storage_path").eq("bundle_id", bundleId).eq("user_id", ctx.userId).not("storage_path", "is", null);
@@ -235,6 +239,7 @@ export async function deleteBundle(ctx: BundleContext, bundleId: string): Promis
 
   const { error } = await ctx.supabase.from("product_bundles").delete().eq("id", bundleId).eq("user_id", ctx.userId);
   if (error) throw new BundleServiceError(friendlyDbErrorMessage(error, "Could not delete the bundle."), "db_error");
+  return { projectId: bundle.project_id };
 }
 
 /** Bulk resolver for a project's bundle list page — returns designs' eligibility keyed by design id, for a batch of designs at once. */

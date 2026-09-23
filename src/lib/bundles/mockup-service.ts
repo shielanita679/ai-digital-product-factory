@@ -206,7 +206,7 @@ export async function generateMockups(
   designId: string,
   templateTypes: MockupTemplateType[],
   options: { providerOverride?: MockupProvider } = {},
-): Promise<{ results: Array<{ templateType: MockupTemplateType; status: "completed" | "failed" | "skipped"; reason?: string }> }> {
+): Promise<{ results: Array<{ templateType: MockupTemplateType; status: "completed" | "failed" | "skipped"; reason?: string }>; projectId: string }> {
   const { bundle, design } = await loadOwnedBundleAndDesign(ctx, bundleId, designId);
 
   let provider: MockupProvider;
@@ -233,7 +233,7 @@ export async function generateMockups(
   });
 
   await recomputeBundleMockupCount(ctx.supabase, bundleId);
-  return { results };
+  return { results, projectId: bundle.project_id };
 }
 
 /**
@@ -241,7 +241,7 @@ export async function generateMockups(
  * Storage object is removed before the database row, and the row is
  * deliberately kept if that Storage delete fails.
  */
-export async function deleteMockup(ctx: MockupContext, mockupId: string): Promise<void> {
+export async function deleteMockup(ctx: MockupContext, mockupId: string): Promise<{ projectId: string; bundleId: string }> {
   const { data: mockup, error } = await ctx.supabase.from("mockups").select("*").eq("id", mockupId).eq("user_id", ctx.userId).single();
   if (error || !mockup) throw new MockupServiceError("Mockup not found.", "not_found");
 
@@ -257,6 +257,7 @@ export async function deleteMockup(ctx: MockupContext, mockupId: string): Promis
   if (deleteError) throw new MockupServiceError(friendlyDbErrorMessage(deleteError, "Could not delete the mockup."), "db_error");
 
   await recomputeBundleMockupCount(ctx.supabase, mockup.bundle_id);
+  return { projectId: mockup.project_id, bundleId: mockup.bundle_id };
 }
 
 export async function getMockupDownloadUrl(ctx: MockupContext, mockupId: string): Promise<{ url: string; filename: string }> {
