@@ -91,13 +91,39 @@ create index if not exists idx_vectorizations_user_id on public.vectorizations (
 
 alter table public.vectorizations enable row level security;
 
--- Strict owner-only RLS, identical in shape to public.designs' policies.
--- user_id is always the server-derived auth.uid() of the caller (see
--- VectorizationContext in vectorize-service.ts) — a design/project's
--- OWN user_id is re-verified server-side before any row here is
--- touched, so this policy is a second, independent enforcement layer,
--- not the only one. Cross-user access is impossible: every one of the
--- four operations below requires auth.uid() = user_id.
+-- Strict owner-only RLS, identical in shape to public.designs' policies —
+-- EXCEPT for INSERT/UPDATE, which need one more thing than "designs" does.
+--
+-- SELECT and DELETE only ever touch rows already scoped to auth.uid() =
+-- user_id, so a bare ownership check is sufficient for those two: neither
+-- can be used to CREATE a cross-user reference, only to read/remove one
+-- that (per the INSERT/UPDATE checks below) can no longer exist.
+--
+-- INSERT and UPDATE are different: `auth.uid() = user_id` alone only
+-- proves the CALLER owns the row being written — it says nothing about
+-- whether design_id/project_id actually belong to that same user. Without
+-- the EXISTS(...) below, an authenticated User A could INSERT a row with
+-- user_id = A but design_id/project_id pointing at User B's design and
+-- project (both FKs only check that the referenced row EXISTS somewhere,
+-- not who owns it). Because design_id is UNIQUE across this whole table
+-- (see the comment on public.vectorizations above), that single write
+-- would permanently squat User B's design_id slot: User B's own,
+-- legitimate vectorize attempt would then fail the unique constraint,
+-- and User B can neither see nor delete the blocking row (their own
+-- SELECT/DELETE policies require user_id = B, but the poisoned row has
+-- user_id = A) — a durable, silent cross-user denial-of-service, not
+-- just orphaned/inconsistent data. The EXISTS(...) clause closes this by
+-- requiring the referenced design to actually belong to the SAME user_id
+-- being written AND to have that SAME project_id — i.e. the three IDs on
+-- the new/updated row must be a real, consistent (user, project, design)
+-- triple, not merely three independently-valid-but-unrelated foreign keys.
+--
+-- DO NOT simplify this back to `auth.uid() = user_id` alone — that
+-- reopens exactly the cross-user vectorizations_design_id_unique
+-- squatting/denial-of-service described above. If this table's shape
+-- changes such that design_id or project_id can be legitimately absent
+-- or reassigned, this check must be reconsidered deliberately, not
+-- dropped for convenience.
 create policy "Users can view their own vectorizations"
   on public.vectorizations
   for select
@@ -106,13 +132,31 @@ create policy "Users can view their own vectorizations"
 create policy "Users can create their own vectorizations"
   on public.vectorizations
   for insert
-  with check (auth.uid() = user_id);
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1
+      from public.designs d
+      where d.id = design_id
+        and d.user_id = user_id
+        and d.project_id = project_id
+    )
+  );
 
 create policy "Users can update their own vectorizations"
   on public.vectorizations
   for update
   using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1
+      from public.designs d
+      where d.id = design_id
+        and d.user_id = user_id
+        and d.project_id = project_id
+    )
+  );
 
 create policy "Users can delete their own vectorizations"
   on public.vectorizations

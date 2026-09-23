@@ -269,6 +269,51 @@ describe("vectorizeDesign", () => {
   });
 });
 
+/**
+ * APPLICATION-LAYER ownership-consistency tests — a different layer than
+ * the RLS fix in the migration. These use the same in-memory fake as the
+ * rest of this file, which does NOT evaluate real Postgres RLS policies,
+ * so they cannot prove the database itself rejects a cross-user
+ * (user_id, design_id, project_id) triple — that requires a live
+ * Postgres run against the applied migration (see
+ * supabase/tests/20260926_vectorizations_rls.sql, documented there and
+ * NOT run automatically, since the migration hasn't been applied).
+ * What these tests DO prove: vectorizeDesign() never has the opportunity
+ * to construct a mismatched triple in the first place, because
+ * project_id is always read off the SAME already-ownership-verified
+ * design row design_id came from (see the `project_id: design.project_id`
+ * insert payload in vectorize-service.ts) — it is never taken from caller
+ * input. This is defense-in-depth at the application layer, independent
+ * of and in addition to the database-level RLS fix.
+ */
+describe("vectorizeDesign — application-layer ownership consistency (not an RLS test — see supabase/tests/20260926_vectorizations_rls.sql for that)", () => {
+  it("never inserts a project_id other than the owning design's own project_id", async () => {
+    const design = makeCompletedDesign({ project_id: "project-real" });
+    const db: Db = { designs: [design], vectorizations: [] };
+    const supabase = makeFakeSupabase(db);
+    const provider = makeStubProvider({ ok: true, svg: VALID_MOCK_SVG, providerName: "stub", providerVectorizationId: "z", settingsApplied: {} });
+
+    await vectorizeDesign({ supabase, userId: "user-1" }, design.id as string, { providerOverride: provider });
+
+    expect(db.vectorizations).toHaveLength(1);
+    expect(db.vectorizations[0].project_id).toBe("project-real");
+    expect(db.vectorizations[0].design_id).toBe(design.id);
+    expect(db.vectorizations[0].user_id).toBe("user-1");
+  });
+
+  it("cannot be made to target a design belonging to a different user — ownership is re-derived server-side from ctx.userId, never taken from any caller-suppliable field", async () => {
+    const bDesign = makeCompletedDesign({ user_id: "user-B", project_id: "project-B" });
+    const db: Db = { designs: [bDesign], vectorizations: [] };
+    const supabase = makeFakeSupabase(db);
+
+    // Caller is user-A; vectorizeDesign() takes only a designId, so
+    // there is no field through which user-A could ever supply user-B's
+    // project_id or claim ownership of user-B's design.
+    await expect(vectorizeDesign({ supabase, userId: "user-A" }, bDesign.id as string)).rejects.toMatchObject({ code: "not_found" });
+    expect(db.vectorizations).toHaveLength(0);
+  });
+});
+
 describe("getVectorizationDownloadUrl", () => {
   it("returns a signed URL with a .svg filename for a completed vectorization owned by the caller", async () => {
     const design = makeCompletedDesign({ title: "Cute Cat!!" });
