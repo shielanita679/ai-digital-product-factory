@@ -49,9 +49,10 @@ create table if not exists public.credit_accounts (
 comment on table public.credit_accounts is
   'One row per user — the current authoritative credit balance. Never
    written directly by any client; only public.credit_ledger_apply()
-   (service-role only) and public.credit_ledger_apply_own() (authenticated,
-   self-scoped) may mutate it, always together with a matching
-   credit_ledger row in the same transaction.';
+   (service-role ONLY — see that function''s own security-fix comment for
+   why there is deliberately no authenticated-callable variant) may
+   mutate it, always together with a matching credit_ledger row in the
+   same transaction.';
 
 alter table public.credit_accounts enable row level security;
 
@@ -88,6 +89,27 @@ create table if not exists public.credit_ledger (
   entry_type text not null check (
     entry_type in ('signup_grant', 'subscription_grant', 'generation_charge', 'refund', 'adjustment')
   ),
+
+  -- SECURITY (Phase 11 post-review fix): sign is tied to entry_type at the
+  -- schema level, never left to application code alone as the only
+  -- guard. A 'generation_charge' can never be a credit, a 'refund' can
+  -- never be a debit, and a grant can never be negative. 'adjustment' is
+  -- the sole exception, DELIBERATELY allowed either sign — it is the
+  -- service_role-only manual-correction entry type (never reachable by
+  -- any authenticated user's own request), used for both crediting a
+  -- seller (e.g. a support-driven goodwill grant) and clawing back a
+  -- mistaken grant, so restricting its sign would defeat its purpose.
+  constraint credit_ledger_amount_sign_matches_entry_type check (
+    case entry_type
+      when 'generation_charge' then amount < 0
+      when 'signup_grant' then amount > 0
+      when 'subscription_grant' then amount > 0
+      when 'refund' then amount > 0
+      when 'adjustment' then true
+      else false
+    end
+  ),
+
   reason text not null check (char_length(btrim(reason)) > 0),
 
   -- Free-form audit context (e.g. reference_type='generation_job',
@@ -274,13 +296,50 @@ comment on table public.stripe_webhook_events is
 
 alter table public.stripe_webhook_events enable row level security;
 
+-- ===========================================================================
+-- SECURITY FIX (post-implementation review, before this migration was ever
+-- applied) — READ BEFORE RE-ADDING ANY AUTHENTICATED-CALLABLE CREDIT RPC
+-- ===========================================================================
+-- The first draft of this migration also defined
+-- `credit_ledger_apply_own(p_amount, p_entry_type, ...)`, granted to the
+-- `authenticated` role, which derived the caller's identity safely from
+-- auth.uid() but still let the CALLER CHOOSE p_amount and p_entry_type
+-- (restricted only to 'generation_charge'/'refund'). That was exploitable:
+-- an authenticated user could call it directly (PostgREST exposes any
+-- GRANTed RPC to any role holding EXECUTE, regardless of which
+-- application code the developer intended to be the only caller) with
+-- e.g. p_entry_type = 'refund', p_amount = 1000000, a fresh
+-- idempotency_key, and mint arbitrary credits into their own account —
+-- deriving identity from auth.uid() prevents touching ANOTHER user's
+-- balance, but does nothing to stop a user from inflating their OWN
+-- balance via a mutation type/amount they were never supposed to choose.
+-- The function has been removed entirely, never applied to a live
+-- database. The corrected architecture: `credit_ledger_apply` below is
+-- the ONLY credit-mutation function, granted ONLY to `service_role`, and
+-- EVERY credit mutation in this codebase — signup grants, subscription
+-- grants, generation charges, generation refunds, manual adjustments —
+-- is issued by trusted server code (Server Actions / the webhook route)
+-- using the service-role client, with user_id, amount, entry_type, and
+-- idempotency_key computed entirely server-side and never accepted from
+-- a client. See src/lib/credits/credit-service.ts's applyCreditMutation()
+-- and src/lib/generation/generation-billing.ts for the corrected call
+-- sites. As defense in depth beyond removing the RPC, this migration also
+-- adds a schema-level CHECK (credit_ledger_amount_sign_matches_entry_type,
+-- above) tying entry_type to amount's sign, and idempotency-key-reuse
+-- mismatch detection (below) — so even a future bug in trusted server
+-- code that mislabels a mutation, or reuses a key across two different
+-- mutations, fails loudly instead of corrupting the ledger.
+
 -- ---------------------------------------------------------------------------
--- credit_ledger_apply — the ONE atomic core: validates, checks idempotency,
--- locks the account row, verifies sufficient balance for a debit, inserts
--- the ledger row, and updates the account balance — all within a single
--- function invocation (a single transaction from the caller's point of
--- view). service_role only; see credit_ledger_apply_own() below for the
--- authenticated-user-safe wrapper.
+-- credit_ledger_apply — the ONE atomic core, and the ONLY function in this
+-- schema that may mutate credit_accounts/credit_ledger: validates,
+-- enforces idempotency (including rejecting a key reused for a DIFFERENT
+-- mutation — see below), locks the account row, verifies sufficient
+-- balance for a debit, inserts the ledger row, and updates the account
+-- balance — all within a single function invocation (a single
+-- transaction from the caller's point of view). service_role ONLY — see
+-- the security-fix note above for why no authenticated-callable variant
+-- exists.
 -- ---------------------------------------------------------------------------
 -- SECURITY DEFINER with a pinned search_path (never trusts the caller's
 -- search_path to resolve `public.credit_accounts`/`public.credit_ledger`),
@@ -307,6 +366,11 @@ set search_path = public, pg_temp
 as $$
 declare
   v_existing_id uuid;
+  v_existing_user_id uuid;
+  v_existing_amount bigint;
+  v_existing_entry_type text;
+  v_existing_reference_type text;
+  v_existing_reference_id text;
   v_current_balance bigint;
   v_new_balance bigint;
   v_ledger_id uuid;
@@ -324,10 +388,31 @@ begin
     raise exception 'invalid entry_type: %', p_entry_type using errcode = '22023';
   end if;
 
-  -- Idempotency fast path: a duplicate caller gets back the SAME result
-  -- the original call produced, without touching the balance again.
-  select credit_ledger.id into v_existing_id from public.credit_ledger where credit_ledger.idempotency_key = p_idempotency_key;
+  -- Idempotency fast path: a duplicate caller presenting the SAME key for
+  -- the SAME mutation gets back the SAME result the original call
+  -- produced, without touching the balance again. SECURITY (post-review
+  -- fix): the key is trusted to identify a REPLAY of the exact same
+  -- mutation, never merely "some earlier row happened to use this key" —
+  -- a caller presenting a key that already exists but with a DIFFERENT
+  -- user_id/amount/entry_type/reference is a conflict, rejected outright,
+  -- never silently handed back someone else's ledger entry id and
+  -- balance (idempotency_key is globally unique across ALL users, so
+  -- without this check a colliding key from a different mutation would
+  -- otherwise leak another mutation's ledger_id/balance shape to the
+  -- caller and skip applying the caller's own intended mutation).
+  select credit_ledger.id, credit_ledger.user_id, credit_ledger.amount, credit_ledger.entry_type, credit_ledger.reference_type, credit_ledger.reference_id
+    into v_existing_id, v_existing_user_id, v_existing_amount, v_existing_entry_type, v_existing_reference_type, v_existing_reference_id
+    from public.credit_ledger where credit_ledger.idempotency_key = p_idempotency_key;
+
   if v_existing_id is not null then
+    if v_existing_user_id <> p_user_id
+       or v_existing_amount <> p_amount
+       or v_existing_entry_type <> p_entry_type
+       or v_existing_reference_type is distinct from p_reference_type
+       or v_existing_reference_id is distinct from p_reference_id
+    then
+      raise exception 'idempotency_key_conflict' using errcode = '23505', detail = p_idempotency_key;
+    end if;
     select credit_accounts.balance into v_current_balance from public.credit_accounts where credit_accounts.user_id = p_user_id;
     return query select v_existing_id, coalesce(v_current_balance, 0::bigint), true;
     return;
@@ -352,11 +437,23 @@ begin
     returning credit_ledger.id into v_ledger_id;
   exception when unique_violation then
     -- Lost a race on idempotency_key to a concurrent caller between the
-    -- fast-path check above and this insert — treat it exactly like the
-    -- fast-path duplicate: return the OTHER call's result, and critically,
-    -- do NOT fall through to the balance update below (that would
-    -- double-apply the mutation the concurrent winner already applied).
-    select credit_ledger.id into v_existing_id from public.credit_ledger where credit_ledger.idempotency_key = p_idempotency_key;
+    -- fast-path check above and this insert — apply the SAME mismatch
+    -- check as the fast path before treating the other row as a valid
+    -- duplicate of THIS call, and do NOT fall through to the balance
+    -- update below in either case (that would double-apply a mutation
+    -- the concurrent winner already applied).
+    select credit_ledger.id, credit_ledger.user_id, credit_ledger.amount, credit_ledger.entry_type, credit_ledger.reference_type, credit_ledger.reference_id
+      into v_existing_id, v_existing_user_id, v_existing_amount, v_existing_entry_type, v_existing_reference_type, v_existing_reference_id
+      from public.credit_ledger where credit_ledger.idempotency_key = p_idempotency_key;
+    if v_existing_id is null
+       or v_existing_user_id <> p_user_id
+       or v_existing_amount <> p_amount
+       or v_existing_entry_type <> p_entry_type
+       or v_existing_reference_type is distinct from p_reference_type
+       or v_existing_reference_id is distinct from p_reference_id
+    then
+      raise exception 'idempotency_key_conflict' using errcode = '23505', detail = p_idempotency_key;
+    end if;
     return query select v_existing_id, v_current_balance, true;
     return;
   end;
@@ -374,49 +471,6 @@ $$;
 
 revoke all on function public.credit_ledger_apply(uuid, bigint, text, text, text, text, text, jsonb) from public;
 grant execute on function public.credit_ledger_apply(uuid, bigint, text, text, text, text, text, jsonb) to service_role;
-
--- ---------------------------------------------------------------------------
--- credit_ledger_apply_own — the authenticated-user-safe entry point.
--- ---------------------------------------------------------------------------
--- Never accepts a caller-supplied user_id — identity comes exclusively
--- from auth.uid(), so an authenticated user calling this RPC can only ever
--- mutate their OWN account, structurally (not just by application-layer
--- convention). Further restricts entry_type to generation_charge/refund
--- only: grants (signup_grant/subscription_grant) and manual adjustments
--- can NEVER be reached through this authenticated path, even if a future
--- bug in application code tried to route one through it.
-create or replace function public.credit_ledger_apply_own(
-  p_amount bigint,
-  p_entry_type text,
-  p_reason text,
-  p_idempotency_key text,
-  p_reference_type text default null,
-  p_reference_id text default null,
-  p_metadata jsonb default '{}'::jsonb
-)
-returns table (ledger_id uuid, balance bigint, was_duplicate boolean)
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_user_id uuid;
-begin
-  v_user_id := auth.uid();
-  if v_user_id is null then
-    raise exception 'not_authenticated' using errcode = '28000';
-  end if;
-  if p_entry_type not in ('generation_charge', 'refund') then
-    raise exception 'entry_type not allowed via the self-service path: %', p_entry_type using errcode = '42501';
-  end if;
-
-  return query
-    select * from public.credit_ledger_apply(v_user_id, p_amount, p_entry_type, p_reason, p_idempotency_key, p_reference_type, p_reference_id, p_metadata);
-end;
-$$;
-
-revoke all on function public.credit_ledger_apply_own(bigint, text, text, text, text, text, jsonb) from public;
-grant execute on function public.credit_ledger_apply_own(bigint, text, text, text, text, text, jsonb) to authenticated;
 
 -- Cascade behavior summary:
 --   auth.users deleted -> credit_accounts/credit_ledger/subscriptions/stripe_customers rows deleted (user_id FK)

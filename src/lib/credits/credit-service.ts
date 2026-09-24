@@ -36,57 +36,43 @@ function mapRpcError(error: { code?: string; message?: string; details?: string 
   if (error?.message?.includes("not_authenticated")) {
     return new CreditServiceError("You must be signed in.", "not_authenticated");
   }
+  if (error?.message?.includes("idempotency_key_conflict")) {
+    return new CreditServiceError("A credit operation with this idempotency key already exists for a different mutation.", "db_error");
+  }
   return new CreditServiceError(friendlyDbErrorMessage(error, "Could not update your credit balance."), "db_error");
 }
 
 /**
- * Debits or credits the CALLING user's OWN account — identity comes from
- * the RLS-scoped client's own session (auth.uid() inside
- * credit_ledger_apply_own, never a parameter), so this can never touch
- * another user's balance regardless of what ctx.userId happens to be.
- * Restricted at the database layer to entry_type 'generation_charge' /
- * 'refund' only — see the migration's credit_ledger_apply_own() comment.
+ * SECURITY (Phase 11 post-review fix): the ONLY function in this codebase
+ * that calls the service-role-only credit_ledger_apply() RPC — every
+ * credit mutation (signup grants, subscription grants, generation
+ * charges, generation refunds, manual adjustments) goes through this one
+ * function. `supabase` MUST be a service-role client (see
+ * src/lib/supabase/service-role.ts); user_id, amount, entry_type, and
+ * idempotency_key are all REQUIRED, explicit parameters the caller must
+ * derive itself from trusted server-side context (an authenticated
+ * session's user id, a server-computed cost/plan amount, a
+ * server-generated key) — never from browser-supplied input.
+ *
+ * There is deliberately NO "apply to the calling user's own account"
+ * variant exposed to the `authenticated` Postgres role: an earlier draft
+ * of the Phase 11 migration defined credit_ledger_apply_own(), granted to
+ * `authenticated`, which derived identity safely from auth.uid() but
+ * still let the caller choose the amount and entry_type (restricted only
+ * to generation_charge/refund) — an authenticated user could call it
+ * directly with entry_type='refund', amount=1000000 and mint arbitrary
+ * credits into their own account. That function has been removed from
+ * the migration entirely (never applied to a live database), and every
+ * former caller now goes through this service-role path instead, with
+ * the credit cost derived server-side (see
+ * src/lib/generation/generation-billing.ts).
  */
-export async function applyOwnLedgerEntry(
-  ctx: CreditContext,
-  input: {
-    amount: number;
-    entryType: Extract<CreditEntryType, "generation_charge" | "refund">;
-    reason: string;
-    idempotencyKey: string;
-    referenceType?: string;
-    referenceId?: string;
-    metadata?: Record<string, unknown>;
-  },
-): Promise<LedgerApplyResult> {
-  const { data, error } = await ctx.supabase.rpc("credit_ledger_apply_own", {
-    p_amount: input.amount,
-    p_entry_type: input.entryType,
-    p_reason: input.reason,
-    p_idempotency_key: input.idempotencyKey,
-    p_reference_type: input.referenceType ?? null,
-    p_reference_id: input.referenceId ?? null,
-    p_metadata: (input.metadata ?? {}) as Json,
-  });
-  if (error || !data || data.length === 0) throw mapRpcError(error);
-  const row = data[0];
-  return { ledgerId: row.ledger_id, balance: row.balance, wasDuplicate: row.was_duplicate };
-}
-
-/**
- * Grants or adjusts an ARBITRARY user's balance — service-role only (the
- * underlying credit_ledger_apply() function has no EXECUTE grant for
- * `authenticated`, so this throws a permission error if ever called with
- * an RLS-scoped client). Used exclusively by WebhookService (subscription
- * grants) and ensureSignupCreditsGranted below (signup grants) — never
- * exposed to a client-supplied user_id.
- */
-export async function grantCredits(
+export async function applyCreditMutation(
   supabase: SupabaseClient<Database>,
   input: {
     userId: string;
     amount: number;
-    entryType: Extract<CreditEntryType, "signup_grant" | "subscription_grant" | "adjustment">;
+    entryType: CreditEntryType;
     reason: string;
     idempotencyKey: string;
     referenceType?: string;
@@ -107,6 +93,29 @@ export async function grantCredits(
   if (error || !data || data.length === 0) throw mapRpcError(error);
   const row = data[0];
   return { ledgerId: row.ledger_id, balance: row.balance, wasDuplicate: row.was_duplicate };
+}
+
+/**
+ * Grants or adjusts an ARBITRARY user's balance — a thin, semantically
+ * narrowed alias of applyCreditMutation restricted to the grant/adjust
+ * entry types, for callers (WebhookService, ensureSignupCreditsGranted)
+ * that should never be able to pass a generation_charge/refund by
+ * mistake. `supabase` MUST be a service-role client.
+ */
+export async function grantCredits(
+  supabase: SupabaseClient<Database>,
+  input: {
+    userId: string;
+    amount: number;
+    entryType: Extract<CreditEntryType, "signup_grant" | "subscription_grant" | "adjustment">;
+    reason: string;
+    idempotencyKey: string;
+    referenceType?: string;
+    referenceId?: string;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<LedgerApplyResult> {
+  return applyCreditMutation(supabase, input);
 }
 
 /**

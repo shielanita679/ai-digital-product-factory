@@ -1053,18 +1053,6 @@ export type Database = {
         };
         Returns: { ledger_id: string; balance: number; was_duplicate: boolean }[];
       };
-      credit_ledger_apply_own: {
-        Args: {
-          p_amount: number;
-          p_entry_type: string;
-          p_reason: string;
-          p_idempotency_key: string;
-          p_reference_type?: string | null;
-          p_reference_id?: string | null;
-          p_metadata?: Json;
-        };
-        Returns: { ledger_id: string; balance: number; was_duplicate: boolean }[];
-      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

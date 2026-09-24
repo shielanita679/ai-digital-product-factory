@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import type { GenerationContext } from "@/lib/generation/generation-service";
 import { startGenerationJob, GenerationServiceError } from "@/lib/generation/generation-service";
 import { getImageProvider } from "@/lib/ai/provider-registry";
-import { applyOwnLedgerEntry, CreditServiceError } from "@/lib/credits/credit-service";
+import { applyCreditMutation, CreditServiceError } from "@/lib/credits/credit-service";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { CREDIT_COSTS } from "@/config/credits";
 
 /**
@@ -44,6 +45,22 @@ import { CREDIT_COSTS } from "@/config/credits";
  * generation_refund:{jobId} — matching the Phase 11 spec's own suggested
  * naming — so it can never double-refund even if this wrapper were ever
  * invoked twice for the same completed job.
+ *
+ * SECURITY (Phase 11 post-review fix): every credit mutation below goes
+ * through applyCreditMutation() on a SERVICE-ROLE client, never the
+ * caller's RLS-scoped ctx.supabase — an earlier version called a
+ * client-callable "charge/refund my own account" RPC
+ * (credit_ledger_apply_own), which was found to let an authenticated
+ * caller mint arbitrary credits by invoking it directly with a
+ * self-chosen amount/entry_type (see credit-service.ts's
+ * applyCreditMutation() doc comment and the migration's own security-fix
+ * comment for the full writeup). ctx.userId is safe to pass here because
+ * it is derived server-side from the authenticated session in
+ * startGenerationAction (src/app/actions/generation.ts), never accepted
+ * from the browser; reserveAmount/actualCost/unused are all computed
+ * server-side from CREDIT_COSTS and the project's own
+ * requested_design_count / the job's own completed_count — the browser
+ * never supplies a credit amount anywhere in this flow.
  */
 export async function startGenerationJobWithCredits(ctx: GenerationContext, projectId: string): Promise<{ jobId: string }> {
   const provider = getImageProvider();
@@ -56,6 +73,7 @@ export async function startGenerationJobWithCredits(ctx: GenerationContext, proj
     throw new GenerationServiceError("Product not found.", "not_found");
   }
 
+  const serviceRole = createServiceRoleClient();
   const requestedCount = project.requested_design_count;
   const costPerImage = CREDIT_COSTS.imageGeneration;
   const reserveAmount = requestedCount * costPerImage;
@@ -63,7 +81,8 @@ export async function startGenerationJobWithCredits(ctx: GenerationContext, proj
 
   if (reserveAmount > 0) {
     try {
-      await applyOwnLedgerEntry(ctx, {
+      await applyCreditMutation(serviceRole, {
+        userId: ctx.userId,
         amount: -reserveAmount,
         entryType: "generation_charge",
         reason: `Reserved for ${requestedCount} design generation${requestedCount === 1 ? "" : "s"}`,
@@ -86,7 +105,8 @@ export async function startGenerationJobWithCredits(ctx: GenerationContext, proj
     jobId = result.jobId;
   } catch (err) {
     if (reserveAmount > 0) {
-      await applyOwnLedgerEntry(ctx, {
+      await applyCreditMutation(serviceRole, {
+        userId: ctx.userId,
         amount: reserveAmount,
         entryType: "refund",
         reason: "Refund: generation did not start",
@@ -104,7 +124,8 @@ export async function startGenerationJobWithCredits(ctx: GenerationContext, proj
     const actualCost = completedCount * costPerImage;
     const unused = reserveAmount - actualCost;
     if (unused > 0) {
-      await applyOwnLedgerEntry(ctx, {
+      await applyCreditMutation(serviceRole, {
+        userId: ctx.userId,
         amount: unused,
         entryType: "refund",
         reason: `Refund for ${requestedCount - completedCount} design(s) that did not complete`,

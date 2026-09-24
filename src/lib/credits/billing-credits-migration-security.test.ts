@@ -7,10 +7,24 @@ import { join } from "path";
  * database test (the migration hasn't been applied). Directly applies the
  * Phase 7-10 lesson (qualify every outer-row reference inside a
  * correlated context) AND the Phase 11-specific security requirement:
- * the two credit-mutation functions must have their PUBLIC execute
- * privilege revoked and only the correct role granted — this is the
- * primary defense against "User A calls the atomic credit RPC against
- * B" and "an authenticated user increases their own balance directly".
+ * the ONE credit-mutation function, credit_ledger_apply, must have its
+ * PUBLIC execute privilege revoked and ONLY service_role granted — never
+ * authenticated — which is the primary defense against "User A calls the
+ * atomic credit RPC against B" and "an authenticated user increases their
+ * own balance directly".
+ *
+ * SECURITY (post-review fix): an earlier draft of this migration also
+ * defined credit_ledger_apply_own(), granted to `authenticated`, which
+ * derived the caller's identity safely from auth.uid() but still let the
+ * caller choose the mutation amount/entry_type — exploitable to mint
+ * arbitrary credits via e.g. entry_type='refund', amount=1000000. That
+ * function was removed entirely before this migration was ever applied.
+ * The tests below assert both the positive requirement (credit_ledger_apply
+ * is service_role-only) AND the negative one (that removed function, or
+ * anything like it, does not exist anywhere in this file, and NO function
+ * in this file grants EXECUTE to `authenticated` at all) — a regression
+ * that reintroduced either would be caught here before ever reaching a
+ * live database.
  */
 const migrationPath = join(__dirname, "../../../supabase/migrations/20261004000000_create_billing_credits.sql");
 const sql = readFileSync(migrationPath, "utf8");
@@ -108,37 +122,42 @@ describe("credit_ledger_apply — the arbitrary-user_id core function", () => {
     expect(grantBlock).toMatch(/grant execute on function public\.credit_ledger_apply\([^)]*\) to service_role/i);
     expect(grantBlock).not.toMatch(/grant execute on function public\.credit_ledger_apply\([^)]*\) to authenticated/i);
   });
+
+  it("checks idempotency_key reuse for a MISMATCHED mutation (different user_id/amount/entry_type/reference) and rejects it, both on the fast path and the exception-race path", () => {
+    const conflictOccurrences = (body.match(/idempotency_key_conflict/gi) ?? []).length;
+    // Must appear at least twice: once in the fast-path duplicate check
+    // before the account is even locked, and once in the unique_violation
+    // exception handler covering the TOCTOU race — a regression that
+    // dropped either path back to "any matching key is a valid duplicate"
+    // would only leave one occurrence (or zero).
+    expect(conflictOccurrences).toBeGreaterThanOrEqual(2);
+  });
+
+  it("the mismatch check compares user_id, amount, and entry_type (not merely the idempotency_key) before treating a match as a valid duplicate", () => {
+    expect(body).toMatch(/v_existing_user_id\s*<>\s*p_user_id/i);
+    expect(body).toMatch(/v_existing_amount\s*<>\s*p_amount/i);
+    expect(body).toMatch(/v_existing_entry_type\s*<>\s*p_entry_type/i);
+  });
 });
 
-describe("credit_ledger_apply_own — the authenticated-user-safe wrapper", () => {
-  const fn = functionBody("credit_ledger_apply_own");
-  const body = fn.body;
-
-  it("is SECURITY DEFINER with a pinned search_path", () => {
-    expect(body).toMatch(/security definer/i);
-    expect(body).toMatch(/set search_path = public, pg_temp/i);
+describe("SECURITY: the removed credit_ledger_apply_own vulnerability does not exist anywhere in this migration", () => {
+  it("no function named credit_ledger_apply_own is defined anywhere in the file", () => {
+    expect(sql).not.toMatch(/create (or replace )?function public\.credit_ledger_apply_own/i);
   });
 
-  it("derives identity EXCLUSIVELY from auth.uid() — takes no user_id parameter at all", () => {
-    expect(body).toMatch(/v_user_id\s*:=\s*auth\.uid\(\)/i);
-    // The function signature (between the name and RETURNS) must not declare a p_user_id parameter.
-    const signatureEnd = body.indexOf(")\nreturns");
-    const signature = body.slice(0, signatureEnd);
-    expect(signature).not.toMatch(/p_user_id/i);
+  it("no GRANT EXECUTE to the authenticated role exists anywhere in the file, for ANY function", () => {
+    // The strongest form of this check: rather than asserting the absence
+    // of one specific function name (which a differently-named
+    // reintroduction of the same bug would dodge), assert that NOTHING in
+    // this migration ever grants EXECUTE to `authenticated` at all —
+    // every credit-mutation capability in this schema is service_role-only.
+    expect(sql).not.toMatch(/grant execute on function[^;]*to authenticated/i);
   });
 
-  it("rejects entry types other than generation_charge/refund — grants can never be reached through this path", () => {
-    expect(body).toMatch(/p_entry_type not in \('generation_charge', 'refund'\)/i);
-  });
-
-  it("rejects an unauthenticated caller", () => {
-    expect(body).toMatch(/not_authenticated/i);
-  });
-
-  it("PUBLIC execute is revoked and ONLY authenticated is granted", () => {
-    const grantBlock = sql.slice(fn.end, fn.end + 500);
-    expect(grantBlock).toMatch(/revoke all on function public\.credit_ledger_apply_own\([^)]*\) from public/i);
-    expect(grantBlock).toMatch(/grant execute on function public\.credit_ledger_apply_own\([^)]*\) to authenticated/i);
+  it("credit_ledger_apply is the ONLY function this migration defines", () => {
+    const functionDefinitions = sql.match(/create (or replace )?function public\.\w+/gi) ?? [];
+    expect(functionDefinitions).toHaveLength(1);
+    expect(functionDefinitions[0]).toMatch(/credit_ledger_apply$/i);
   });
 });
 
@@ -149,6 +168,20 @@ describe("schema-level invariants", () => {
 
   it("credit_ledger.idempotency_key is UNIQUE", () => {
     expect(sql).toMatch(/constraint credit_ledger_idempotency_key_unique unique \(idempotency_key\)/i);
+  });
+
+  it("SECURITY: credit_ledger has a schema-level CHECK tying amount's sign to entry_type — defense in depth beyond application code", () => {
+    expect(sql).toMatch(/constraint credit_ledger_amount_sign_matches_entry_type check/i);
+    const constraintStart = sql.indexOf("constraint credit_ledger_amount_sign_matches_entry_type");
+    const constraintBlock = sql.slice(constraintStart, constraintStart + 500);
+    expect(constraintBlock).toMatch(/when 'generation_charge' then amount < 0/i);
+    expect(constraintBlock).toMatch(/when 'signup_grant' then amount > 0/i);
+    expect(constraintBlock).toMatch(/when 'subscription_grant' then amount > 0/i);
+    expect(constraintBlock).toMatch(/when 'refund' then amount > 0/i);
+    // adjustment is the one entry_type explicitly allowed either sign — assert it's a
+    // deliberate `then true`, not an oversight that happens to fall through to `else false`.
+    expect(constraintBlock).toMatch(/when 'adjustment' then true/i);
+    expect(constraintBlock).toMatch(/else false/i);
   });
 
   it("credit_accounts.balance can never go negative at the schema level (defense in depth beyond the function's own check)", () => {
