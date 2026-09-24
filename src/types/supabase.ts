@@ -842,9 +842,230 @@ export type Database = {
           },
         ];
       };
+      // Phase 11 — credits + Stripe billing. Undefined at runtime (not
+      // just null/missing rows) if this migration hasn't been applied
+      // yet — code reading these tables must degrade gracefully, exactly
+      // like every other post-Phase-4 table.
+      credit_accounts: {
+        Row: {
+          user_id: string;
+          balance: number;
+          lifetime_granted: number;
+          lifetime_consumed: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          balance?: number;
+          lifetime_granted?: number;
+          lifetime_consumed?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          balance?: number;
+          lifetime_granted?: number;
+          lifetime_consumed?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "credit_accounts_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      credit_ledger: {
+        Row: {
+          id: string;
+          user_id: string;
+          amount: number;
+          entry_type: string;
+          reason: string;
+          reference_type: string | null;
+          reference_id: string | null;
+          idempotency_key: string;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          amount: number;
+          entry_type: string;
+          reason: string;
+          reference_type?: string | null;
+          reference_id?: string | null;
+          idempotency_key: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          amount?: number;
+          entry_type?: string;
+          reason?: string;
+          reference_type?: string | null;
+          reference_id?: string | null;
+          idempotency_key?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "credit_ledger_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      stripe_customers: {
+        Row: {
+          user_id: string;
+          stripe_customer_id: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          stripe_customer_id: string;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          stripe_customer_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stripe_customers_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          stripe_customer_id: string;
+          stripe_subscription_id: string | null;
+          stripe_price_id: string | null;
+          plan_key: string;
+          status: string;
+          current_period_start: string | null;
+          current_period_end: string | null;
+          cancel_at_period_end: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          stripe_customer_id: string;
+          stripe_subscription_id?: string | null;
+          stripe_price_id?: string | null;
+          plan_key: string;
+          status: string;
+          current_period_start?: string | null;
+          current_period_end?: string | null;
+          cancel_at_period_end?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          stripe_customer_id?: string;
+          stripe_subscription_id?: string | null;
+          stripe_price_id?: string | null;
+          plan_key?: string;
+          status?: string;
+          current_period_start?: string | null;
+          current_period_end?: string | null;
+          cancel_at_period_end?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      stripe_webhook_events: {
+        Row: {
+          id: string;
+          stripe_event_id: string;
+          event_type: string;
+          status: string;
+          processed_at: string | null;
+          error_message: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          stripe_event_id: string;
+          event_type: string;
+          status?: string;
+          processed_at?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          stripe_event_id?: string;
+          event_type?: string;
+          status?: string;
+          processed_at?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      credit_ledger_apply: {
+        Args: {
+          p_user_id: string;
+          p_amount: number;
+          p_entry_type: string;
+          p_reason: string;
+          p_idempotency_key: string;
+          p_reference_type?: string | null;
+          p_reference_id?: string | null;
+          p_metadata?: Json;
+        };
+        Returns: { ledger_id: string; balance: number; was_duplicate: boolean }[];
+      };
+      credit_ledger_apply_own: {
+        Args: {
+          p_amount: number;
+          p_entry_type: string;
+          p_reason: string;
+          p_idempotency_key: string;
+          p_reference_type?: string | null;
+          p_reference_id?: string | null;
+          p_metadata?: Json;
+        };
+        Returns: { ledger_id: string; balance: number; was_duplicate: boolean }[];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
@@ -860,3 +1081,8 @@ export type BundleItem = Database["public"]["Tables"]["bundle_items"]["Row"];
 export type Mockup = Database["public"]["Tables"]["mockups"]["Row"];
 export type ProductListing = Database["public"]["Tables"]["product_listings"]["Row"];
 export type ProductPackage = Database["public"]["Tables"]["product_packages"]["Row"];
+export type CreditAccount = Database["public"]["Tables"]["credit_accounts"]["Row"];
+export type CreditLedgerEntry = Database["public"]["Tables"]["credit_ledger"]["Row"];
+export type Subscription = Database["public"]["Tables"]["subscriptions"]["Row"];
+export type StripeWebhookEvent = Database["public"]["Tables"]["stripe_webhook_events"]["Row"];
+export type StripeCustomerMapping = Database["public"]["Tables"]["stripe_customers"]["Row"];

@@ -29,6 +29,6 @@ export const dashboardNav: DashboardNavItem[] = [
   { label: "Downloads", href: "/dashboard/downloads", icon: Download },
   { label: "Templates", href: "/dashboard/templates", icon: LayoutTemplate, comingSoon: true },
   { label: "Credits", href: "/dashboard/credits", icon: Coins, comingSoon: true },
-  { label: "Billing", href: "/dashboard/billing", icon: CreditCard, comingSoon: true },
+  { label: "Billing", href: "/dashboard/billing", icon: CreditCard },
   { label: "Settings", href: "/dashboard/settings", icon: Settings, comingSoon: true },
 ];

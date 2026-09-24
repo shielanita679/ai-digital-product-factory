@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/supabase/current-user";
 import {
-  startGenerationJob,
   retryDesign,
   deleteDesign,
   GenerationServiceError,
 } from "@/lib/generation/generation-service";
+import { startGenerationJobWithCredits } from "@/lib/generation/generation-billing";
 import { DesignStorage } from "@/lib/storage/design-storage";
 import { startGenerationSchema, designIdSchema } from "@/lib/validations/generation";
 import type { ActionResult } from "@/app/actions/projects";
@@ -32,7 +32,7 @@ export async function startGenerationAction(input: unknown): Promise<ActionResul
   const { supabase, user } = await requireUser();
 
   try {
-    const result = await startGenerationJob({ supabase, userId: user.id }, parsed.data.projectId);
+    const result = await startGenerationJobWithCredits({ supabase, userId: user.id }, parsed.data.projectId);
     revalidateGenerationPaths(parsed.data.projectId);
     return { ok: true, data: result };
   } catch (err) {

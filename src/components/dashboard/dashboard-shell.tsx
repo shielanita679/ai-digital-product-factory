@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Menu, LogOut } from "lucide-react";
 
 import { Logo } from "@/components/layout/logo";
@@ -34,11 +35,14 @@ export function DashboardShell({
   email,
   initials,
   onSignOut,
+  creditBalance,
   children,
 }: {
   email: string;
   initials: string;
   onSignOut: () => Promise<void>;
+  /** null when Phase 11 billing isn't configured/migrated yet — the server remains authoritative; this is display-only, never used for enforcement here. */
+  creditBalance: number | null;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -80,13 +84,15 @@ export function DashboardShell({
           <div className="hidden lg:block" />
 
           <div className="flex items-center gap-3">
-            <Badge
-              variant="outline"
-              className="hidden text-muted-foreground sm:inline-flex"
-              title="Credit tracking isn't wired up yet"
-            >
-              — credits
-            </Badge>
+            <Link href="/dashboard/billing">
+              <Badge
+                variant="outline"
+                className="hidden text-muted-foreground transition-colors hover:text-foreground sm:inline-flex"
+                title={creditBalance === null ? "Credit tracking isn't set up in this environment yet" : "View billing and credit history"}
+              >
+                {creditBalance === null ? "— credits" : `${creditBalance.toLocaleString()} credits`}
+              </Badge>
+            </Link>
             <ThemeToggle />
             <div
               title={email}

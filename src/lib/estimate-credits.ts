@@ -1,8 +1,12 @@
+import { CREDIT_COSTS } from "@/config/credits";
+
 /**
- * Placeholder credit-estimation abstraction. Phase 11 replaces this with
- * real ledger-backed pricing; until then this is a preview only — nothing
- * is charged or stored against it.
+ * Wizard-side preview only — nothing is charged or stored against it. The
+ * authoritative charge happens server-side in
+ * src/lib/generation/generation-billing.ts, which reads the SAME
+ * CREDIT_COSTS.imageGeneration constant so this preview can never drift
+ * from what actually gets billed.
  */
 export function estimateGenerationCredits(input: { designCount: number }): number {
-  return input.designCount;
+  return input.designCount * CREDIT_COSTS.imageGeneration;
 }

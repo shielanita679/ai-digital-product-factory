@@ -4,6 +4,9 @@ import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { SupabaseSetupNotice } from "@/components/dashboard/supabase-setup-notice";
 import { signOutAction } from "@/app/actions/auth";
 import { getAuthState } from "@/lib/supabase/current-user";
+import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { ensureSignupCreditsGranted, getBalance } from "@/lib/credits/credit-service";
 
 function getInitials(name: string | null | undefined, email: string) {
   const source = name?.trim() || email;
@@ -42,11 +45,32 @@ export default async function DashboardLayout({
     redirect("/onboarding");
   }
 
+  // Idempotent per user (see ensureSignupCreditsGranted's own doc
+  // comment) — safe to call on every dashboard page load, including for
+  // users who existed before Phase 11 shipped. Best-effort: a missing
+  // migration, unconfigured service-role key, or any other failure here
+  // must never break the dashboard shell, so both steps degrade silently
+  // to a "no balance to show" state.
+  let creditBalance: number | null = null;
+  try {
+    const serviceRole = createServiceRoleClient();
+    await ensureSignupCreditsGranted(serviceRole, user.id);
+  } catch {
+    // Not configured / migration not applied / etc. — nothing to grant yet.
+  }
+  try {
+    const supabase = await createClient();
+    creditBalance = await getBalance({ supabase, userId: user.id });
+  } catch {
+    creditBalance = null;
+  }
+
   return (
     <DashboardShell
       email={user.email ?? ""}
       initials={getInitials(profile?.full_name, user.email ?? "")}
       onSignOut={signOutAction}
+      creditBalance={creditBalance}
     >
       {children}
     </DashboardShell>

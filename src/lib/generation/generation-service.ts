@@ -51,7 +51,13 @@ export type GenerationServiceErrorCode =
   | "job_already_active"
   | "migration_not_applied"
   | "provider_error"
-  | "db_error";
+  | "db_error"
+  // Phase 11 — thrown only by the credit-enforced wrapper in
+  // generation-billing.ts, never by startGenerationJob itself (which
+  // makes no credit calls at all). Included here rather than on a
+  // separate error class so callers can catch GenerationServiceError
+  // uniformly regardless of which entry point they used.
+  | "insufficient_credits";
 
 export class GenerationServiceError extends Error {
   readonly code: GenerationServiceErrorCode;
