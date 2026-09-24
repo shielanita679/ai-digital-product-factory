@@ -117,10 +117,53 @@ describe("credit_ledger_apply — the arbitrary-user_id core function", () => {
   });
 
   it("PUBLIC execute is revoked and ONLY service_role is granted — never authenticated", () => {
-    const grantBlock = sql.slice(fn.end, fn.end + 500);
+    const grantBlock = sql.slice(fn.end, fn.end + 1600);
     expect(grantBlock).toMatch(/revoke all on function public\.credit_ledger_apply\([^)]*\) from public/i);
     expect(grantBlock).toMatch(/grant execute on function public\.credit_ledger_apply\([^)]*\) to service_role/i);
     expect(grantBlock).not.toMatch(/grant execute on function public\.credit_ledger_apply\([^)]*\) to authenticated/i);
+  });
+
+  /**
+   * LIVE-VERIFICATION FINDING: `revoke ... from public` ALONE is
+   * insufficient on a Supabase project. Supabase provisions every new
+   * project with `alter default privileges ... in schema public grant
+   * execute on functions to anon, authenticated, service_role`, which
+   * grants `authenticated` (and `anon`) a DIRECT, explicit EXECUTE
+   * privilege the moment a function is created — independent of whatever
+   * PUBLIC holds. `revoke ... from public` does not touch a privilege
+   * granted directly to a named role. This was live-verified against a
+   * real deployed database: after `revoke ... from public` alone was
+   * applied, an authenticated test user could still call
+   * credit_ledger_apply directly with entry_type='refund', amount=1000000
+   * and successfully mint credits (HTTP 200, no error) — and could
+   * equally mutate a DIFFERENT user's account by supplying their
+   * p_user_id. Only explicitly naming `anon` and `authenticated` in the
+   * REVOKE closed it: verified afterward, every authenticated/anon/
+   * cross-user attack failed with Postgres 42501 "permission denied for
+   * function credit_ledger_apply", while service_role continued to work
+   * normally. The tests below check the EXACT function signature (not a
+   * loose `[^)]*` wildcard) so a signature drift can't silently dodge them.
+   */
+  const CREDIT_LEDGER_APPLY_SIGNATURE = "public.credit_ledger_apply(uuid, bigint, text, text, text, text, text, jsonb)";
+
+  it("REGRESSION (live-verification finding): the REVOKE statement explicitly names PUBLIC, anon, AND authenticated — revoking from PUBLIC alone is insufficient on Supabase", () => {
+    const grantBlock = sql.slice(fn.end, fn.end + 1600);
+    const revokeMatch = grantBlock.match(new RegExp(`revoke all on function ${CREDIT_LEDGER_APPLY_SIGNATURE.replace(/[().]/g, "\\$&")} from ([^;]+);`, "i"));
+    expect(revokeMatch).not.toBeNull();
+    const revokedFrom = (revokeMatch![1] ?? "").split(",").map((s) => s.trim().toLowerCase());
+    expect(revokedFrom).toEqual(expect.arrayContaining(["public", "anon", "authenticated"]));
+  });
+
+  it("the GRANT statement, on the exact function signature, names service_role and ONLY service_role", () => {
+    const grantBlock = sql.slice(fn.end, fn.end + 1600);
+    const grantMatch = grantBlock.match(new RegExp(`grant execute on function ${CREDIT_LEDGER_APPLY_SIGNATURE.replace(/[().]/g, "\\$&")} to ([^;]+);`, "i"));
+    expect(grantMatch).not.toBeNull();
+    const grantedTo = (grantMatch![1] ?? "").split(",").map((s) => s.trim().toLowerCase());
+    expect(grantedTo).toEqual(["service_role"]);
+  });
+
+  it("no GRANT EXECUTE to anon exists anywhere in the file, for ANY function", () => {
+    expect(sql).not.toMatch(/grant execute on function[^;]*to anon\b/i);
   });
 
   it("checks idempotency_key reuse for a MISMATCHED mutation (different user_id/amount/entry_type/reference) and rejects it, both on the fast path and the exception-race path", () => {

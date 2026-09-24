@@ -469,7 +469,24 @@ begin
 end;
 $$;
 
-revoke all on function public.credit_ledger_apply(uuid, bigint, text, text, text, text, text, jsonb) from public;
+-- SECURITY (live-verification post-fix, before this migration's first
+-- real apply): `revoke ... from public` ALONE is not sufficient on a
+-- Supabase project. Supabase provisions every new project with
+-- `alter default privileges ... in schema public grant execute on
+-- functions to anon, authenticated, service_role` — meaning `authenticated`
+-- (and `anon`) receive a DIRECT, explicit EXECUTE grant on this function
+-- the moment it's created, independent of whatever PUBLIC holds. A
+-- `revoke ... from public` does not touch a privilege granted directly to
+-- a named role, so it left `authenticated` (and `anon`) still able to
+-- call this function — live-verified: an authenticated test user calling
+-- credit_ledger_apply with entry_type='refund', amount=1000000 succeeded
+-- and minted credits, even after `revoke ... from public` had been
+-- applied. Naming `anon` and `authenticated` explicitly, as below, is
+-- what actually closes this — verified live afterward: every
+-- authenticated/anon/cross-user attack now fails with Postgres 42501
+-- "permission denied for function credit_ledger_apply", and service_role
+-- continues to work normally.
+revoke all on function public.credit_ledger_apply(uuid, bigint, text, text, text, text, text, jsonb) from public, anon, authenticated;
 grant execute on function public.credit_ledger_apply(uuid, bigint, text, text, text, text, text, jsonb) to service_role;
 
 -- Cascade behavior summary:
