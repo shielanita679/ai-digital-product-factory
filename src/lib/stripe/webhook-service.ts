@@ -1,4 +1,4 @@
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/types/supabase";
@@ -88,6 +88,64 @@ async function syncSubscriptionRecord(supabase: SupabaseClient<Database>, subscr
 }
 
 /**
+ * SECURITY/CORRECTNESS (post-live-verification fix): the ONLY way any
+ * `customer.subscription.*` webhook may update our `subscriptions` table.
+ * Never persists the webhook payload's own embedded subscription object —
+ * only ever the result of a FRESH `stripe.subscriptions.retrieve()` call,
+ * keyed by the subscription id the (already signature-verified) event
+ * refers to. Stripe does not guarantee webhook delivery order, so trusting
+ * an event's own embedded snapshot lets an older, already-superseded
+ * snapshot silently overwrite newer state if it happens to be *processed*
+ * after a newer one — live-verified: two `customer.subscription.updated`
+ * deliveries ~0.5s apart, both HTTP 200 and marked `processed`, ended with
+ * `cancel_at_period_end` reverted from `true` back to `false`. Re-fetching
+ * fresh on every delivery removes delivery order from the equation
+ * entirely: whichever event triggers the fetch, the fetch itself always
+ * returns whatever is CURRENTLY true on Stripe's side at that moment, so
+ * the persisted state can never be staler than reality, regardless of
+ * which event arrived first, last, or was redelivered.
+ *
+ * Never accepts a subscription id from anywhere but a verified webhook
+ * event's own `data.object.id` — never from browser input, never
+ * constructed from any other source.
+ */
+async function syncSubscriptionFresh(supabase: SupabaseClient<Database>, subscriptionId: string): Promise<{ userId: string } | null> {
+  const stripe = getStripeClient();
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  return syncSubscriptionRecord(supabase, subscription);
+}
+
+/**
+ * Fallback for `customer.subscription.deleted` ONLY, and ONLY when a fresh
+ * retrieve confirms the subscription is genuinely gone (Stripe returned
+ * `resource_missing`) — most canceled subscriptions remain retrievable
+ * (status simply flips to 'canceled'), so this path is rare in practice.
+ * Deliberately minimal: matches an EXISTING local row purely by
+ * `stripe_subscription_id` (a value that came from the verified event,
+ * used here only to locate a row we already trust — never to fabricate
+ * one) and marks it terminally canceled. If no local row matches, this is
+ * a safe no-op — there is nothing to tombstone and nothing to resurrect.
+ *
+ * Why this can never resurrect a subscription a later, out-of-order
+ * created/updated event might still report: every created/updated
+ * delivery ALWAYS goes through syncSubscriptionFresh first (never this
+ * function), which either (a) also gets `resource_missing` — because the
+ * subscription really is gone — and therefore fails the webhook safely
+ * without writing anything (see the Failure Behavior comment on
+ * dispatchEvent's created/updated case), leaving this tombstone intact;
+ * or (b) succeeds, in which case Stripe's own API is returning the
+ * CURRENT true object, which — since the deletion already genuinely
+ * happened — reports `status: "canceled"` itself, so the sync writes the
+ * same terminal state again rather than reverting it. Either way, an
+ * already-deleted subscription can never be written back to an active
+ * status by a stale event.
+ */
+async function tombstoneDeletedSubscription(supabase: SupabaseClient<Database>, subscriptionId: string): Promise<void> {
+  const { error } = await supabase.from("subscriptions").update({ status: "canceled", cancel_at_period_end: false }).eq("stripe_subscription_id", subscriptionId);
+  if (error) throw new Error(`Could not tombstone deleted subscription: ${error.message}`);
+}
+
+/**
  * Monthly credit grant (Phase 11 spec sections 10/11) — the ONLY place
  * credits are granted for a paid subscription, gated on a verified
  * `invoice.paid` event, never on `checkout.session.completed`. Fetches
@@ -135,17 +193,49 @@ async function dispatchEvent(supabase: SupabaseClient<Database>, event: Stripe.E
       const session = event.data.object;
       const subRef = session.subscription;
       if (subRef) {
-        const stripe = getStripeClient();
         const subscriptionId = typeof subRef === "string" ? subRef : subRef.id;
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        await syncSubscriptionRecord(supabase, subscription);
+        await syncSubscriptionFresh(supabase, subscriptionId);
       }
       return;
     }
     case "customer.subscription.created":
-    case "customer.subscription.updated":
+    case "customer.subscription.updated": {
+      // SECURITY/CORRECTNESS (post-live-verification fix): never persist
+      // the webhook payload's own embedded subscription snapshot — see
+      // syncSubscriptionFresh's own comment for why. Stripe does not
+      // guarantee delivery order, so two subscription.updated events
+      // arriving out of order (live-verified: two events ~0.5s apart,
+      // both HTTP 200, the LATER-processed one carried the OLDER data)
+      // previously let a stale snapshot silently overwrite newer state
+      // (e.g. a just-scheduled cancel_at_period_end=true reverted back to
+      // false). Re-fetching fresh from Stripe on every delivery makes the
+      // final persisted state independent of delivery order: whichever
+      // event is processed, the fetch always returns whatever is
+      // CURRENTLY true, so the write can never be staler than reality.
+      await syncSubscriptionFresh(supabase, event.data.object.id);
+      return;
+    }
     case "customer.subscription.deleted": {
-      await syncSubscriptionRecord(supabase, event.data.object);
+      // Same fetch-fresh approach as created/updated, EXCEPT: Stripe
+      // subscriptions generally remain retrievable after cancellation
+      // (status flips to 'canceled', the object isn't actually purged),
+      // so the common case still goes through syncSubscriptionFresh. Only
+      // when the retrieve fails with the specific "resource_missing"
+      // error DURING a deleted event do we treat that as confirmed,
+      // terminal deletion and fall back to a narrow tombstone write — see
+      // tombstoneDeletedSubscription's own comment for why this can never
+      // resurrect a subscription a later stale created/updated event
+      // might re-report.
+      const subscriptionId = event.data.object.id;
+      try {
+        await syncSubscriptionFresh(supabase, subscriptionId);
+      } catch (err) {
+        if (err instanceof Stripe.errors.StripeInvalidRequestError && err.code === "resource_missing") {
+          await tombstoneDeletedSubscription(supabase, subscriptionId);
+          return;
+        }
+        throw err; // any other failure: never guess — fail the webhook safely, let Stripe retry.
+      }
       return;
     }
     case "invoice.paid": {

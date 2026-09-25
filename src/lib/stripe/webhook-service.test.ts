@@ -229,35 +229,175 @@ describe("processWebhookEvent — subscription lifecycle sync", () => {
     items: { data: [{ price: { id: "price_starter" }, current_period_start: 1700000000, current_period_end: 1702592000 }] },
   };
 
-  it("customer.subscription.created syncs the subscriptions table", async () => {
+  /**
+   * SECURITY/CORRECTNESS (post-live-verification fix): customer.subscription.*
+   * webhooks now ALWAYS re-fetch fresh from Stripe (via the mocked
+   * retrieveSubscription) rather than trusting the event's own embedded
+   * `data.object` snapshot — these tests assert that by making the fixture's
+   * `data.object` and the mocked retrieve's return value DIFFER, and
+   * checking that the DB ends up with the RETRIEVE's value, never the
+   * event payload's own value.
+   */
+
+  it("customer.subscription.created syncs the subscriptions table from a FRESH Stripe retrieve, not the event payload", async () => {
     const db = emptyDb();
     const supabase = makeFakeSupabase(db);
-    const event = makeEvent("evt_10", "customer.subscription.created", subscriptionFixture);
+    retrieveSubscription.mockResolvedValueOnce(subscriptionFixture);
+    // The event payload itself claims a DIFFERENT status — must be ignored.
+    const event = makeEvent("evt_10", "customer.subscription.created", { ...subscriptionFixture, id: "sub_100", status: "past_due" });
     const result = await processWebhookEvent(supabase, event);
     expect(result.outcome).toBe("processed");
-    expect(db.subscriptions[0]).toMatchObject({ user_id: "u1", stripe_subscription_id: "sub_100", status: "active" });
+    expect(retrieveSubscription).toHaveBeenCalledWith("sub_100");
+    expect(db.subscriptions[0]).toMatchObject({ user_id: "u1", stripe_subscription_id: "sub_100", status: "active" }); // from the retrieve, not the payload's "past_due"
   });
 
-  it("customer.subscription.updated (e.g. past_due) updates the SAME row, not a duplicate", async () => {
+  it("customer.subscription.updated updates the SAME row, not a duplicate, using the fresh retrieve's value", async () => {
     const db = emptyDb();
     const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockResolvedValueOnce(subscriptionFixture);
     await processWebhookEvent(supabase, makeEvent("evt_11", "customer.subscription.created", subscriptionFixture));
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, status: "past_due" });
     await processWebhookEvent(supabase, makeEvent("evt_12", "customer.subscription.updated", { ...subscriptionFixture, status: "past_due" }));
     expect(db.subscriptions).toHaveLength(1);
     expect(db.subscriptions[0].status).toBe("past_due");
   });
 
-  it("customer.subscription.deleted syncs status=canceled", async () => {
+  it("A. an OLDER event snapshot (cancel_at_period_end=false) is processed while Stripe's CURRENT state is cancel_at_period_end=true — the DB ends up true, from the retrieve, not the stale payload", async () => {
     const db = emptyDb();
     const supabase = makeFakeSupabase(db);
-    await processWebhookEvent(supabase, makeEvent("evt_13", "customer.subscription.created", subscriptionFixture));
-    await processWebhookEvent(supabase, makeEvent("evt_14", "customer.subscription.deleted", { ...subscriptionFixture, status: "canceled" }));
+    retrieveSubscription.mockResolvedValueOnce(subscriptionFixture);
+    await processWebhookEvent(supabase, makeEvent("evt_a0", "customer.subscription.created", subscriptionFixture));
+
+    // The event's OWN payload still says false (stale), but Stripe's current truth (the retrieve) says true.
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, cancel_at_period_end: true });
+    const staleEvent = makeEvent("evt_a1", "customer.subscription.updated", { ...subscriptionFixture, cancel_at_period_end: false });
+    const result = await processWebhookEvent(supabase, staleEvent);
+
+    expect(result.outcome).toBe("processed");
+    expect(db.subscriptions[0].cancel_at_period_end).toBe(true);
+  });
+
+  it("B. two subscription.updated events processed out of order both converge on the LATEST canonical Stripe state (exactly the live-verified bug)", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockResolvedValueOnce(subscriptionFixture);
+    await processWebhookEvent(supabase, makeEvent("evt_b0", "customer.subscription.created", subscriptionFixture));
+
+    // First delivery processed: Stripe's current truth at that moment is already cancel_at_period_end=true.
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, cancel_at_period_end: true });
+    await processWebhookEvent(supabase, makeEvent("evt_b1", "customer.subscription.updated", { ...subscriptionFixture, cancel_at_period_end: true }));
+    expect(db.subscriptions[0].cancel_at_period_end).toBe(true);
+
+    // Second delivery processed LATER, but its OWN payload is the OLDER "false" snapshot
+    // (Stripe does not guarantee order) — because we fetch fresh, this must NOT revert anything.
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, cancel_at_period_end: true });
+    await processWebhookEvent(supabase, makeEvent("evt_b2", "customer.subscription.updated", { ...subscriptionFixture, cancel_at_period_end: false }));
+    expect(db.subscriptions[0].cancel_at_period_end).toBe(true); // still true — never reverted
+  });
+
+  it("C. a duplicate delivery of the SAME subscription.updated event id is skipped (safe/idempotent), never re-fetches or re-writes", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockResolvedValueOnce(subscriptionFixture);
+    await processWebhookEvent(supabase, makeEvent("evt_c0", "customer.subscription.created", subscriptionFixture));
+
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, cancel_at_period_end: true });
+    const event = makeEvent("evt_c1", "customer.subscription.updated", { ...subscriptionFixture, cancel_at_period_end: true });
+    const first = await processWebhookEvent(supabase, event);
+    expect(first.outcome).toBe("processed");
+    const retrieveCallsAfterFirst = retrieveSubscription.mock.calls.length;
+
+    const second = await processWebhookEvent(supabase, event); // exact same event id
+    expect(second.outcome).toBe("skipped_duplicate");
+    expect(retrieveSubscription.mock.calls.length).toBe(retrieveCallsAfterFirst); // no additional Stripe call
+    expect(db.subscriptions[0].cancel_at_period_end).toBe(true);
+  });
+
+  it("D. created and updated delivered out of order still converge on the canonical current Stripe state", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+
+    // "updated" is (unrealistically, but per the test's own requirement) delivered/processed BEFORE "created".
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, status: "active" });
+    await processWebhookEvent(supabase, makeEvent("evt_d0", "customer.subscription.updated", { ...subscriptionFixture, status: "trialing" }));
+    expect(db.subscriptions[0].status).toBe("active"); // from the retrieve, not the stale "trialing" payload
+
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, status: "active" });
+    await processWebhookEvent(supabase, makeEvent("evt_d1", "customer.subscription.created", subscriptionFixture));
+    expect(db.subscriptions).toHaveLength(1); // still one row, upserted by user_id
+    expect(db.subscriptions[0].status).toBe("active");
+  });
+
+  it("E. a customer.subscription.deleted event (subscription genuinely gone from Stripe) is followed by a STALE updated delivery — must NOT resurrect the subscription", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockResolvedValueOnce(subscriptionFixture);
+    await processWebhookEvent(supabase, makeEvent("evt_e0", "customer.subscription.created", subscriptionFixture));
+
+    // The subscription has been permanently deleted — Stripe's retrieve now 404s with resource_missing.
+    const resourceMissing = new Stripe.errors.StripeInvalidRequestError({
+      type: "invalid_request_error",
+      code: "resource_missing",
+      message: "No such subscription: 'sub_100'",
+      statusCode: 404,
+    } as never);
+    retrieveSubscription.mockRejectedValueOnce(resourceMissing);
+    const deletedResult = await processWebhookEvent(supabase, makeEvent("evt_e1", "customer.subscription.deleted", subscriptionFixture));
+    expect(deletedResult.outcome).toBe("processed");
+    expect(db.subscriptions[0].status).toBe("canceled"); // tombstoned
+
+    // A STALE updated event for the same (now-deleted) subscription arrives later. Its own
+    // retrieve ALSO 404s (the subscription really is gone) — must fail safely, never resurrect.
+    retrieveSubscription.mockRejectedValueOnce(resourceMissing);
+    const staleUpdate = await processWebhookEvent(supabase, makeEvent("evt_e2", "customer.subscription.updated", { ...subscriptionFixture, status: "active" }));
+    expect(staleUpdate.outcome).toBe("failed"); // fails safely, does not write
+    expect(db.subscriptions[0].status).toBe("canceled"); // still canceled — never resurrected to active
+  });
+
+  it("E2. when the deleted subscription IS still retrievable (the common Stripe case), it syncs status=canceled via the normal fresh-fetch path — no tombstone needed", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockResolvedValueOnce(subscriptionFixture);
+    await processWebhookEvent(supabase, makeEvent("evt_e3", "customer.subscription.created", subscriptionFixture));
+
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, status: "canceled" });
+    const result = await processWebhookEvent(supabase, makeEvent("evt_e4", "customer.subscription.deleted", { ...subscriptionFixture, status: "canceled" }));
+    expect(result.outcome).toBe("processed");
     expect(db.subscriptions[0].status).toBe("canceled");
+  });
+
+  it("F. Stripe subscription retrieval fails with a non-resource_missing error — no stale snapshot is persisted, webhook fails safely for retry", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockRejectedValueOnce(new Error("simulated network failure"));
+    const event = makeEvent("evt_f0", "customer.subscription.updated", { ...subscriptionFixture, status: "active" });
+    const result = await processWebhookEvent(supabase, event);
+
+    expect(result.outcome).toBe("failed");
+    expect(result.error).toContain("simulated network failure");
+    expect(db.subscriptions).toHaveLength(0); // nothing written — the payload's own snapshot was never trusted as a fallback
+  });
+
+  it("F2. a created event's retrieval fails with resource_missing (NOT a deleted event) — still fails safely, never tombstones or writes anything", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+    const resourceMissing = new Stripe.errors.StripeInvalidRequestError({
+      type: "invalid_request_error",
+      code: "resource_missing",
+      message: "No such subscription: 'sub_999'",
+      statusCode: 404,
+    } as never);
+    retrieveSubscription.mockRejectedValueOnce(resourceMissing);
+    const result = await processWebhookEvent(supabase, makeEvent("evt_f1", "customer.subscription.created", { ...subscriptionFixture, id: "sub_999" }));
+
+    expect(result.outcome).toBe("failed"); // the resource_missing tombstone fallback is scoped to `deleted` events only
+    expect(db.subscriptions).toHaveLength(0);
   });
 
   it("a subscription event with no metadata.user_id is safely ignored (never guesses ownership)", async () => {
     const db = emptyDb();
     const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, metadata: {} });
     const event = makeEvent("evt_15", "customer.subscription.created", { ...subscriptionFixture, metadata: {} });
     const result = await processWebhookEvent(supabase, event);
     expect(result.outcome).toBe("processed"); // acknowledged, not a failure
