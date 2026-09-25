@@ -7,13 +7,30 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createBillingPortalSessionAction } from "@/app/actions/billing";
-import { subscriptionStatusMeta, subscriptionStatusLabel } from "@/config/subscription";
+import { subscriptionStatusMeta, subscriptionStatusLabel, hasScheduledCancellation, getEffectiveCancellationDate } from "@/config/subscription";
 import { planLabel } from "@/config/plans";
 import type { BillingState } from "@/lib/billing/billing-service";
+import type { Subscription } from "@/types/supabase";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+/**
+ * Exported as a pure function (same convention as
+ * listing-license-section.tsx's pickDefaultMarketplace) so the
+ * Cancels-vs-Renews decision is directly unit-testable without rendering.
+ * See hasScheduledCancellation's own comment for why cancel_at_period_end
+ * alone is not a sufficient signal.
+ */
+export function getRenewalOrCancellationLabel(subscription: Pick<Subscription, "status" | "cancel_at_period_end" | "cancel_at" | "current_period_end">): string {
+  const scheduled = hasScheduledCancellation(subscription.status, subscription.cancel_at_period_end, subscription.cancel_at);
+  if (scheduled) {
+    const date = getEffectiveCancellationDate(subscription.cancel_at, subscription.cancel_at_period_end, subscription.current_period_end);
+    return `Cancels on ${formatDate(date)}`;
+  }
+  return `Renews on ${formatDate(subscription.current_period_end)}`;
 }
 
 export function SubscriptionStatusCard({
@@ -54,11 +71,7 @@ export function SubscriptionStatusCard({
               {subscription && <Badge variant={statusMeta?.badgeVariant ?? "outline"}>{subscriptionStatusLabel(subscription.status)}</Badge>}
               {!subscription && <Badge variant="outline">Free</Badge>}
             </div>
-            {subscription?.current_period_end && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                {subscription.cancel_at_period_end ? "Cancels" : "Renews"} on {formatDate(subscription.current_period_end)}
-              </p>
-            )}
+            {subscription?.current_period_end && <p className="mt-1 text-xs text-muted-foreground">{getRenewalOrCancellationLabel(subscription)}</p>}
           </div>
 
           <div className="text-right">

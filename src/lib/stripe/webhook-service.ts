@@ -80,6 +80,15 @@ async function syncSubscriptionRecord(supabase: SupabaseClient<Database>, subscr
       current_period_start: item ? new Date(item.current_period_start * 1000).toISOString() : null,
       current_period_end: item ? new Date(item.current_period_end * 1000).toISOString() : null,
       cancel_at_period_end: subscription.cancel_at_period_end,
+      // Stripe's SEPARATE explicit-scheduled-cancellation mechanism — see
+      // this migration's own comment (20261005000000) for why
+      // cancel_at_period_end alone is not sufficient: Stripe can schedule a
+      // future cancellation via cancel_at without ever setting
+      // cancel_at_period_end=true. Deliberately NOT reading canceled_at
+      // here — that field can be populated by Stripe while status is still
+      // 'active' (it records when a cancellation was SCHEDULED, not that
+      // the subscription has ended) and is never used by this app.
+      cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
     },
     { onConflict: "user_id" },
   );

@@ -262,6 +262,70 @@ describe("processWebhookEvent — subscription lifecycle sync", () => {
     expect(db.subscriptions[0].status).toBe("past_due");
   });
 
+  /**
+   * H/I — Stripe's explicit scheduled-cancellation timestamp (cancel_at),
+   * a SEPARATE mechanism from cancel_at_period_end this app previously
+   * never persisted. Live-verified root cause: Stripe Customer Portal
+   * showed "Cancels Oct 25" while cancel_at_period_end was false and
+   * cancel_at held the matching future timestamp.
+   */
+  it("H. persists a freshly-retrieved cancel_at (Stripe's explicit scheduled-cancellation timestamp) onto the subscriptions row", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, cancel_at_period_end: false, cancel_at: 1792919792 });
+    const result = await processWebhookEvent(supabase, makeEvent("evt_h0", "customer.subscription.updated", subscriptionFixture));
+
+    expect(result.outcome).toBe("processed");
+    expect(db.subscriptions[0].cancel_at_period_end).toBe(false);
+    expect(db.subscriptions[0].cancel_at).toBe(new Date(1792919792 * 1000).toISOString());
+  });
+
+  it("H2. a later update WITHOUT cancel_at set clears the previously-stored value (removing scheduled cancellation is correctly reflected, not left stale)", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, cancel_at: 1792919792 });
+    await processWebhookEvent(supabase, makeEvent("evt_i0", "customer.subscription.updated", subscriptionFixture));
+    expect(db.subscriptions[0].cancel_at).not.toBeNull();
+
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, cancel_at: null });
+    await processWebhookEvent(supabase, makeEvent("evt_i1", "customer.subscription.updated", subscriptionFixture));
+    expect(db.subscriptions[0].cancel_at).toBeNull();
+  });
+
+  it("I. removing a scheduled cancellation (cancel_at_period_end flips back to false, cancel_at cleared) is correctly synced from the fresh retrieve", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, cancel_at_period_end: true, cancel_at: null });
+    await processWebhookEvent(supabase, makeEvent("evt_i2", "customer.subscription.updated", subscriptionFixture));
+    expect(db.subscriptions[0].cancel_at_period_end).toBe(true);
+
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, cancel_at_period_end: false, cancel_at: null });
+    await processWebhookEvent(supabase, makeEvent("evt_i3", "customer.subscription.updated", subscriptionFixture));
+    expect(db.subscriptions[0].cancel_at_period_end).toBe(false);
+    expect(db.subscriptions[0].cancel_at).toBeNull();
+  });
+
+  it("F. a scheduled cancellation does not revoke entitlement — status stays 'active', which isEntitledStatus still treats as entitled", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, status: "active", cancel_at_period_end: false, cancel_at: 1792919792 });
+    await processWebhookEvent(supabase, makeEvent("evt_f10", "customer.subscription.updated", subscriptionFixture));
+
+    expect(db.subscriptions[0].status).toBe("active");
+    const { isEntitledStatus } = await import("@/config/subscription");
+    expect(isEntitledStatus(db.subscriptions[0].status as string)).toBe(true);
+  });
+
+  it("G. syncing a scheduled cancellation makes ZERO credit ledger calls — subscription sync and credit mutation are fully independent paths", async () => {
+    const db = emptyDb();
+    const supabase = makeFakeSupabase(db);
+    retrieveSubscription.mockResolvedValueOnce({ ...subscriptionFixture, cancel_at_period_end: false, cancel_at: 1792919792 });
+    await processWebhookEvent(supabase, makeEvent("evt_g0", "customer.subscription.updated", subscriptionFixture));
+
+    expect(db.credit_ledger).toHaveLength(0);
+    expect(db.credit_accounts).toHaveLength(0);
+  });
+
   it("A. an OLDER event snapshot (cancel_at_period_end=false) is processed while Stripe's CURRENT state is cancel_at_period_end=true — the DB ends up true, from the retrieve, not the stale payload", async () => {
     const db = emptyDb();
     const supabase = makeFakeSupabase(db);
