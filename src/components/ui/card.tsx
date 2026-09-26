@@ -25,9 +25,20 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+/**
+ * Renders a `<div>` by default (unchanged for every existing call site).
+ * Pass `as="h1"`/`"h2"`/etc. when this title is the only heading-shaped
+ * text on a page — e.g. the auth pages, whose only page title otherwise
+ * lived in a non-heading `<div>`, leaving zero heading elements for
+ * screen-reader "jump to heading" navigation.
+ */
+function CardTitle({
+  className,
+  as: Component = "div",
+  ...props
+}: React.ComponentProps<"div"> & { as?: "div" | "h1" | "h2" | "h3" | "h4" }) {
   return (
-    <div
+    <Component
       data-slot="card-title"
       className={cn("text-lg leading-none font-semibold tracking-tight", className)}
       {...props}

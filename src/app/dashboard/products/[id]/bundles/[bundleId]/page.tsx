@@ -30,50 +30,53 @@ export default async function BundleDetailPage({
   const { id: projectId, bundleId } = await params;
   const supabase = await createClient();
 
-  const { data: project, error: projectError } = await supabase.from("projects").select("*").eq("id", projectId).single();
+  // Neither depends on the other's result — both are keyed only by the
+  // route params — so they run concurrently rather than as two serialized
+  // round-trips.
+  const [
+    { data: project, error: projectError },
+    { data: bundle, error: bundleError },
+  ] = await Promise.all([
+    supabase.from("projects").select("*").eq("id", projectId).single(),
+    supabase.from("product_bundles").select("*").eq("id", bundleId).eq("project_id", projectId).single(),
+  ]);
   if (projectError || !project) notFound();
-
-  const { data: bundle, error: bundleError } = await supabase.from("product_bundles").select("*").eq("id", bundleId).eq("project_id", projectId).single();
   if (bundleError || !bundle) notFound();
 
-  const { data: designs } = await supabase
-    .from("designs")
-    .select("*")
-    .eq("project_id", projectId)
-    .order("variation_index", { ascending: true });
+  // designs/bundleItems/mockups/listings/packages/coverUrl are all
+  // independent of each other (each keyed only by projectId/bundleId, or —
+  // for coverUrl — by `bundle` which is already resolved above), so all six
+  // run concurrently instead of six serialized round-trips. listings/
+  // packages are still queried separately (not joined to designs/mockups)
+  // so a not-yet-applied Phase 9/10 migration degrades gracefully instead
+  // of breaking the whole page.
+  const [
+    { data: designs },
+    { data: bundleItems },
+    { data: mockups },
+    { data: listingsData, error: listingsError },
+    { data: packagesData, error: packagesError },
+    coverUrl,
+  ] = await Promise.all([
+    supabase.from("designs").select("*").eq("project_id", projectId).order("variation_index", { ascending: true }),
+    supabase.from("bundle_items").select("*").eq("bundle_id", bundleId),
+    supabase.from("mockups").select("*").eq("bundle_id", bundleId).order("created_at", { ascending: true }),
+    supabase.from("product_listings").select("*").eq("bundle_id", bundleId).order("created_at", { ascending: true }),
+    supabase.from("product_packages").select("*").eq("bundle_id", bundleId),
+    bundle.cover_storage_path ? new MockupStorage(supabase).createSignedUrl(bundle.cover_storage_path) : Promise.resolve(null),
+  ]);
 
-  const { data: bundleItems } = await supabase.from("bundle_items").select("*").eq("bundle_id", bundleId);
-
-  const { data: mockups } = await supabase.from("mockups").select("*").eq("bundle_id", bundleId).order("created_at", { ascending: true });
-
-  const displayUrlById = await resolveDesignDisplayUrls(supabase, designs ?? []);
-  const vectorizationByDesignId = await resolveVectorizationsForDesigns(supabase, (designs ?? []).map((d) => d.id));
-  const mockupDisplayUrlById = await resolveMockupDisplayUrls(supabase, mockups ?? []);
-
-  let coverUrl: string | null = null;
-  if (bundle.cover_storage_path) {
-    const storage = new MockupStorage(supabase);
-    coverUrl = await storage.createSignedUrl(bundle.cover_storage_path);
-  }
-
-  // Phase 9 — queried separately so a not-yet-applied Phase 9 migration
-  // degrades gracefully instead of breaking the whole page.
-  const { data: listingsData, error: listingsError } = await supabase
-    .from("product_listings")
-    .select("*")
-    .eq("bundle_id", bundleId)
-    .order("created_at", { ascending: true });
   const listingsMigrationApplied = !isMigrationNotAppliedError(listingsError);
   const listings = listingsMigrationApplied ? (listingsData ?? []) : [];
-
-  // Phase 10 — queried separately so a not-yet-applied Phase 10 migration
-  // degrades gracefully instead of breaking the whole page.
-  const { data: packagesData, error: packagesError } = await supabase
-    .from("product_packages")
-    .select("*")
-    .eq("bundle_id", bundleId);
   const packagesMigrationApplied = !isMigrationNotAppliedError(packagesError);
   const packages = packagesMigrationApplied ? (packagesData ?? []) : [];
+
+  // All three depend only on designs/mockups above, never on each other.
+  const [displayUrlById, vectorizationByDesignId, mockupDisplayUrlById] = await Promise.all([
+    resolveDesignDisplayUrls(supabase, designs ?? []),
+    resolveVectorizationsForDesigns(supabase, (designs ?? []).map((d) => d.id)),
+    resolveMockupDisplayUrls(supabase, mockups ?? []),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">

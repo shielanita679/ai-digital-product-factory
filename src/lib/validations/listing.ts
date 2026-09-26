@@ -26,12 +26,18 @@ export const regenerateSectionSchema = z.object({
   confirmOverwriteEdits: z.boolean().default(false),
 });
 
-const tagArray = z.array(z.string().trim().min(1)).max(50);
+// Bounds a manual edit to the loosest per-marketplace limit in
+// src/config/marketplaces.ts (a manual edit isn't scoped to one
+// marketplace's schema the way AI generation is) — this is a ceiling
+// against abuse/resource exhaustion, not a marketplace-accurate limit;
+// the UI/marketplace-specific schemas still guide what a real listing
+// should look like.
+const tagArray = z.array(z.string().trim().min(1).max(50)).max(50);
 
 export const updateListingSchema = z.object({
   id: z.string().uuid(),
-  title: z.string().trim().min(1, "Title can't be empty.").optional(),
-  description: z.string().trim().min(1, "Description can't be empty.").optional(),
+  title: z.string().trim().min(1, "Title can't be empty.").max(200, "Title is too long.").optional(),
+  description: z.string().trim().min(1, "Description can't be empty.").max(5000, "Description is too long.").optional(),
   tags: tagArray.optional(),
   seoKeywords: tagArray.optional(),
 });
@@ -44,7 +50,7 @@ export const generateLicenseSchema = z.object({
 
 export const updateLicenseTextSchema = z.object({
   id: z.string().uuid(),
-  licenseText: z.string().trim().min(1, "License text can't be empty."),
+  licenseText: z.string().trim().min(1, "License text can't be empty.").max(20000, "License text is too long."),
 });
 
 export const resetLicenseSchema = z.object({

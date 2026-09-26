@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/supabase/current-user";
 import { profileSettingsSchema } from "@/lib/validations/settings";
+import { friendlyDbErrorMessage } from "@/lib/supabase/db-error";
 
 export type UpdateProfileSettingsResult = { ok: true } | { ok: false; error: string };
 
@@ -35,7 +36,7 @@ export async function updateProfileSettingsAction(input: unknown): Promise<Updat
     .eq("id", user.id);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: friendlyDbErrorMessage(error, "Could not save your changes. Please try again.") };
   }
 
   revalidatePath("/dashboard/settings/profile");

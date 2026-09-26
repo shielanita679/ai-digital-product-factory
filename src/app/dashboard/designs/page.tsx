@@ -68,8 +68,13 @@ export default async function DesignsPage({
       projectNameById[p.id] = p.name;
     }
   }
-  const displayUrlById = await resolveDesignDisplayUrls(supabase, designs ?? []);
-  const vectorizationByDesignId = await resolveVectorizationsForDesigns(supabase, (designs ?? []).map((d) => d.id));
+  // Both depend only on `designs` above, never on each other, so they run
+  // concurrently; the vector-preview resolver genuinely must wait, since it
+  // needs vectorizationByDesignId's values.
+  const [displayUrlById, vectorizationByDesignId] = await Promise.all([
+    resolveDesignDisplayUrls(supabase, designs ?? []),
+    resolveVectorizationsForDesigns(supabase, (designs ?? []).map((d) => d.id)),
+  ]);
   const vectorPreviewUrlByVectorizationId = await resolveVectorDisplayUrls(supabase, Array.from(vectorizationByDesignId.values()));
 
   return (

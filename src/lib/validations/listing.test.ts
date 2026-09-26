@@ -8,6 +8,7 @@ import {
   buildGeneratedKeywordsSchema,
   generateListingSchema,
   updateListingSchema,
+  updateLicenseTextSchema,
 } from "@/lib/validations/listing";
 import { marketplaceLimits } from "@/config/marketplaces";
 
@@ -104,5 +105,58 @@ describe("updateListingSchema", () => {
   it("rejects an empty title", () => {
     const parsed = updateListingSchema.safeParse({ id: "11111111-1111-1111-1111-111111111111", title: "" });
     expect(parsed.success).toBe(false);
+  });
+
+  // Phase 13 security fix: a manual edit had no upper bound at all, unlike
+  // the AI-generation path (capped by marketplace limits) — an oversized
+  // client-submitted edit could inflate buildPackage's in-memory ZIP-entry
+  // content before MAX_PACKAGE_ZIP_BYTES ever caught it.
+  it("rejects an oversized title (> 200 chars)", () => {
+    const parsed = updateListingSchema.safeParse({ id: "11111111-1111-1111-1111-111111111111", title: "x".repeat(201) });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects an oversized description (> 5000 chars)", () => {
+    const parsed = updateListingSchema.safeParse({ id: "11111111-1111-1111-1111-111111111111", description: "x".repeat(5001) });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects an oversized individual tag (> 50 chars), not just an oversized list", () => {
+    const parsed = updateListingSchema.safeParse({ id: "11111111-1111-1111-1111-111111111111", tags: ["x".repeat(51)] });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("accepts a title/description/tag right at the boundary", () => {
+    const parsed = updateListingSchema.safeParse({
+      id: "11111111-1111-1111-1111-111111111111",
+      title: "x".repeat(200),
+      description: "x".repeat(5000),
+      tags: ["x".repeat(50)],
+    });
+    expect(parsed.success).toBe(true);
+  });
+});
+
+describe("updateLicenseTextSchema", () => {
+  it("accepts normal license text", () => {
+    const parsed = updateLicenseTextSchema.safeParse({ id: "11111111-1111-1111-1111-111111111111", licenseText: "You may use this for personal projects." });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects empty license text", () => {
+    const parsed = updateLicenseTextSchema.safeParse({ id: "11111111-1111-1111-1111-111111111111", licenseText: "" });
+    expect(parsed.success).toBe(false);
+  });
+
+  // Phase 13 security fix: previously unbounded, and license_text is
+  // embedded verbatim into the package ZIP's license.txt.
+  it("rejects oversized license text (> 20000 chars)", () => {
+    const parsed = updateLicenseTextSchema.safeParse({ id: "11111111-1111-1111-1111-111111111111", licenseText: "x".repeat(20001) });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("accepts license text right at the boundary", () => {
+    const parsed = updateLicenseTextSchema.safeParse({ id: "11111111-1111-1111-1111-111111111111", licenseText: "x".repeat(20000) });
+    expect(parsed.success).toBe(true);
   });
 });

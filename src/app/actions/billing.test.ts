@@ -33,6 +33,17 @@ vi.mock("@/lib/stripe/stripe-service", () => ({
   StripeServiceError,
 }));
 
+const enforceRateLimit = vi.fn(async () => undefined);
+class RateLimitError extends Error {
+  code = "rate_limited" as const;
+  retryAfterSeconds: number;
+  constructor(retryAfterSeconds: number) {
+    super(`Too many requests — try again in ${retryAfterSeconds}s.`);
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+vi.mock("@/lib/rate-limit/rate-limiter", () => ({ enforceRateLimit, RateLimitError }));
+
 const { createCheckoutSessionAction, createBillingPortalSessionAction } = await import("@/app/actions/billing");
 
 beforeEach(() => {
@@ -40,6 +51,7 @@ beforeEach(() => {
   createServiceRoleClient.mockClear();
   createCheckoutSession.mockReset();
   createBillingPortalSession.mockReset();
+  enforceRateLimit.mockReset().mockResolvedValue(undefined);
 });
 
 describe("createCheckoutSessionAction", () => {
@@ -80,6 +92,14 @@ describe("createCheckoutSessionAction", () => {
     expect(result.ok).toBe(false);
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
+
+  it("enforces the rate limit before ever calling StripeService, and a RateLimitError surfaces its friendly message", async () => {
+    enforceRateLimit.mockRejectedValueOnce(new RateLimitError(30));
+    const result = await createCheckoutSessionAction({ planId: "starter" });
+    expect(result).toEqual({ ok: false, error: "Too many requests — try again in 30s." });
+    expect(enforceRateLimit).toHaveBeenCalledWith("11111111-1111-1111-1111-111111111111", "stripe_checkout");
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
 });
 
 describe("createBillingPortalSessionAction", () => {
@@ -101,5 +121,13 @@ describe("createBillingPortalSessionAction", () => {
     createBillingPortalSession.mockRejectedValue(new Error("boom"));
     const result = await createBillingPortalSessionAction();
     expect(result).toEqual({ ok: false, error: "Could not open the billing portal. Please try again." });
+  });
+
+  it("enforces the rate limit before ever calling StripeService, and a RateLimitError surfaces its friendly message", async () => {
+    enforceRateLimit.mockRejectedValueOnce(new RateLimitError(15));
+    const result = await createBillingPortalSessionAction();
+    expect(result).toEqual({ ok: false, error: "Too many requests — try again in 15s." });
+    expect(enforceRateLimit).toHaveBeenCalledWith("11111111-1111-1111-1111-111111111111", "stripe_portal");
+    expect(createBillingPortalSession).not.toHaveBeenCalled();
   });
 });

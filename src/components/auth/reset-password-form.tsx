@@ -52,7 +52,7 @@ export function ResetPasswordForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Choose a new password</CardTitle>
+        <CardTitle as="h1" className="text-xl">Choose a new password</CardTitle>
         <CardDescription>
           Set a new password for your account.
         </CardDescription>
@@ -71,10 +71,11 @@ export function ResetPasswordForm() {
               autoComplete="new-password"
               placeholder="••••••••"
               aria-invalid={!!errors.password}
+              aria-describedby="password-error"
               {...register("password")}
             />
             {errors.password && (
-              <p className="text-sm text-destructive">
+              <p id="password-error" className="text-sm text-destructive">
                 {errors.password.message}
               </p>
             )}
@@ -88,17 +89,18 @@ export function ResetPasswordForm() {
               autoComplete="new-password"
               placeholder="••••••••"
               aria-invalid={!!errors.confirmPassword}
+              aria-describedby="confirmPassword-error"
               {...register("confirmPassword")}
             />
             {errors.confirmPassword && (
-              <p className="text-sm text-destructive">
+              <p id="confirmPassword-error" className="text-sm text-destructive">
                 {errors.confirmPassword.message}
               </p>
             )}
           </div>
 
           {formError && (
-            <p className="text-sm text-destructive">{formError}</p>
+            <p role="alert" className="text-sm text-destructive">{formError}</p>
           )}
 
           <Button

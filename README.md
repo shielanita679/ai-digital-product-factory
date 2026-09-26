@@ -53,8 +53,11 @@ npm run lint    # lint the project
 
 - [`docs/PHASE_12.md`](./docs/PHASE_12.md) — Settings, Admin authorization
   model (and how to safely grant/revoke it), the analytics event catalog,
-  rate-limit configuration, error-reporting architecture, and the
-  pre-launch checklist (including the deferred custom-SMTP auth task).
+  rate-limit configuration, and error-reporting architecture.
+- [`docs/PRE_LAUNCH_CHECKLIST.md`](./docs/PRE_LAUNCH_CHECKLIST.md) — the
+  single authoritative pre-launch checklist: custom SMTP/auth email,
+  security, AI providers, Stripe (TEST → LIVE), observability, legal/
+  product, and operations. Nothing is "launch-ready" until this is done.
 
 ## Environment Variables
 

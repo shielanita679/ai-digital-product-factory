@@ -109,19 +109,24 @@ export default async function ProductDetailPage({
   const generationMigrationApplied = !isMigrationNotAppliedError(latestJobResult.error ?? designsResult.error);
   const latestJob = generationMigrationApplied ? (latestJobResult.data ?? null) : null;
   const designs = generationMigrationApplied ? (designsResult.data ?? []) : [];
-  const displayUrlById = await resolveDesignDisplayUrls(supabase, designs);
-  const vectorizationByDesignId = await resolveVectorizationsForDesigns(supabase, designs.map((d) => d.id));
-  const vectorPreviewUrlByVectorizationId = await resolveVectorDisplayUrls(supabase, Array.from(vectorizationByDesignId.values()));
 
-  // Phase 8 — queried separately so a not-yet-applied Phase 8 migration
+  // All three are independent of each other: the two design-derived
+  // resolvers depend only on `designs` above, and the Phase 8 bundles
+  // query depends only on `project.id`, already known — so they run
+  // concurrently. bundlesData/bundlesError is still queried separately
+  // (not joined to designs) so a not-yet-applied Phase 8 migration
   // degrades gracefully instead of breaking the whole page.
-  const { data: bundlesData, error: bundlesError } = await supabase
-    .from("product_bundles")
-    .select("*")
-    .eq("project_id", project.id)
-    .order("created_at", { ascending: false });
+  const [displayUrlById, vectorizationByDesignId, { data: bundlesData, error: bundlesError }] = await Promise.all([
+    resolveDesignDisplayUrls(supabase, designs),
+    resolveVectorizationsForDesigns(supabase, designs.map((d) => d.id)),
+    supabase.from("product_bundles").select("*").eq("project_id", project.id).order("created_at", { ascending: false }),
+  ]);
   const bundlesMigrationApplied = !isMigrationNotAppliedError(bundlesError);
   const bundles = bundlesMigrationApplied ? (bundlesData ?? []) : [];
+
+  // Needs vectorizationByDesignId's values, so this one genuinely must
+  // wait for the group above.
+  const vectorPreviewUrlByVectorizationId = await resolveVectorDisplayUrls(supabase, Array.from(vectorizationByDesignId.values()));
 
   const statusMeta = projectStatusMeta[project.status as keyof typeof projectStatusMeta];
 

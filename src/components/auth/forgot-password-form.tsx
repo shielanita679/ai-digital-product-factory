@@ -58,7 +58,7 @@ export function ForgotPasswordForm() {
           <span className="mb-2 flex size-12 items-center justify-center rounded-2xl bg-brand-gradient text-white">
             <MailCheck className="size-6" />
           </span>
-          <CardTitle className="text-xl">Check your email</CardTitle>
+          <CardTitle as="h1" className="text-xl">Check your email</CardTitle>
           <CardDescription>
             If an account exists for that address, we&apos;ve sent a link to
             reset your password.
@@ -78,7 +78,7 @@ export function ForgotPasswordForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Reset your password</CardTitle>
+        <CardTitle as="h1" className="text-xl">Reset your password</CardTitle>
         <CardDescription>
           Enter your email and we&apos;ll send you a link to reset it.
         </CardDescription>
@@ -97,15 +97,16 @@ export function ForgotPasswordForm() {
               autoComplete="email"
               placeholder="you@example.com"
               aria-invalid={!!errors.email}
+              aria-describedby="email-error"
               {...register("email")}
             />
             {errors.email && (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
+              <p id="email-error" className="text-sm text-destructive">{errors.email.message}</p>
             )}
           </div>
 
           {formError && (
-            <p className="text-sm text-destructive">{formError}</p>
+            <p role="alert" className="text-sm text-destructive">{formError}</p>
           )}
 
           <Button

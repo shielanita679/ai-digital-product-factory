@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/current-user";
 import { onboardingSchema } from "@/lib/validations/onboarding";
 import { AnalyticsService } from "@/lib/analytics/analytics-service";
+import { friendlyDbErrorMessage } from "@/lib/supabase/db-error";
 
 export type SaveOnboardingResult = { ok: true } | { ok: false; error: string };
 
@@ -31,7 +32,7 @@ export async function saveOnboardingAction(input: unknown): Promise<SaveOnboardi
     .eq("id", user.id);
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: friendlyDbErrorMessage(error, "Could not save your answers. Please try again.") };
   }
 
   void AnalyticsService.track({ eventName: "onboarding_completed", userId: user.id });

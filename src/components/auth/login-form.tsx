@@ -52,7 +52,7 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Welcome back</CardTitle>
+        <CardTitle as="h1" className="text-xl">Welcome back</CardTitle>
         <CardDescription>
           Log in to continue creating digital products.
         </CardDescription>
@@ -71,10 +71,11 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
               autoComplete="email"
               placeholder="you@example.com"
               aria-invalid={!!errors.email}
+              aria-describedby="email-error"
               {...register("email")}
             />
             {errors.email && (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
+              <p id="email-error" className="text-sm text-destructive">{errors.email.message}</p>
             )}
           </div>
 
@@ -94,17 +95,18 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
               autoComplete="current-password"
               placeholder="••••••••"
               aria-invalid={!!errors.password}
+              aria-describedby="password-error"
               {...register("password")}
             />
             {errors.password && (
-              <p className="text-sm text-destructive">
+              <p id="password-error" className="text-sm text-destructive">
                 {errors.password.message}
               </p>
             )}
           </div>
 
           {formError && (
-            <p className="text-sm text-destructive">{formError}</p>
+            <p role="alert" className="text-sm text-destructive">{formError}</p>
           )}
 
           <Button

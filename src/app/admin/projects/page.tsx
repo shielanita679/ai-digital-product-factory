@@ -23,28 +23,30 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
 
       <Card>
         <CardContent className="p-0">
-          <div className="divide-y divide-border">
-            <div className="grid grid-cols-6 gap-3 px-4 py-2.5 text-xs font-medium text-muted-foreground">
-              <span className="col-span-2">Name</span>
-              <span>Owner</span>
-              <span>Status</span>
-              <span>Designs</span>
-              <span>Created</span>
-            </div>
-            {projects.map((p) => (
-              <div key={p.id} className="grid grid-cols-6 gap-3 px-4 py-3 text-sm">
-                <span className="col-span-2 truncate">{p.name}</span>
-                <span className="truncate text-muted-foreground" title={p.ownerId}>
-                  {p.ownerEmail ?? p.ownerId}
-                </span>
-                <span>
-                  <Badge variant="outline">{p.status}</Badge>
-                </span>
-                <span>{p.designCount}</span>
-                <span className="text-muted-foreground">{formatDate(p.createdAt)}</span>
+          <div className="overflow-x-auto">
+            <div className="min-w-[720px] divide-y divide-border">
+              <div className="grid grid-cols-6 gap-3 px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                <span className="col-span-2">Name</span>
+                <span>Owner</span>
+                <span>Status</span>
+                <span>Designs</span>
+                <span>Created</span>
               </div>
-            ))}
-            {projects.length === 0 && <p className="px-4 py-6 text-sm text-muted-foreground">No projects found.</p>}
+              {projects.map((p) => (
+                <div key={p.id} className="grid grid-cols-6 gap-3 px-4 py-3 text-sm">
+                  <span className="col-span-2 truncate">{p.name}</span>
+                  <span className="truncate text-muted-foreground" title={p.ownerId}>
+                    {p.ownerEmail ?? p.ownerId}
+                  </span>
+                  <span>
+                    <Badge variant="outline">{p.status}</Badge>
+                  </span>
+                  <span>{p.designCount}</span>
+                  <span className="text-muted-foreground">{formatDate(p.createdAt)}</span>
+                </div>
+              ))}
+              {projects.length === 0 && <p className="px-4 py-6 text-sm text-muted-foreground">No projects found.</p>}
+            </div>
           </div>
         </CardContent>
       </Card>

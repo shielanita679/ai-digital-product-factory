@@ -33,5 +33,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`);
+  // Carries the original `type` through so /auth/auth-code-error can show
+  // signup-appropriate vs. recovery-appropriate copy instead of a single
+  // generic message for both — see that page's own comment for why.
+  const errorRedirect = new URL("/auth/auth-code-error", origin);
+  if (type) errorRedirect.searchParams.set("type", type);
+  return NextResponse.redirect(errorRedirect);
 }

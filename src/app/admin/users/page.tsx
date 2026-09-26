@@ -25,35 +25,37 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
 
       <Card>
         <CardContent className="p-0">
-          <div className="divide-y divide-border">
-            <div className="grid grid-cols-6 gap-3 px-4 py-2.5 text-xs font-medium text-muted-foreground">
-              <span className="col-span-2">Email</span>
-              <span>Signed up</span>
-              <span>Onboarding</span>
-              <span>Plan / status</span>
-              <span>Credits</span>
-            </div>
-            {users.map((u) => (
-              <div key={u.id} className="grid grid-cols-6 gap-3 px-4 py-3 text-sm">
-                <span className="col-span-2 truncate" title={u.id}>
-                  {u.email}
-                </span>
-                <span className="text-muted-foreground">{formatDate(u.createdAt)}</span>
-                <span>
-                  <Badge variant={u.onboardingCompleted ? "success" : "outline"}>
-                    {u.onboardingCompleted ? "Complete" : "Incomplete"}
-                  </Badge>
-                </span>
-                <span className="flex flex-col gap-1">
-                  <span>{planLabel(u.planId)}</span>
-                  {u.subscriptionStatus && (
-                    <span className="text-xs text-muted-foreground">{subscriptionStatusLabel(u.subscriptionStatus)}</span>
-                  )}
-                </span>
-                <span>{u.creditBalance ?? "—"}</span>
+          <div className="overflow-x-auto">
+            <div className="min-w-[720px] divide-y divide-border">
+              <div className="grid grid-cols-6 gap-3 px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                <span className="col-span-2">Email</span>
+                <span>Signed up</span>
+                <span>Onboarding</span>
+                <span>Plan / status</span>
+                <span>Credits</span>
               </div>
-            ))}
-            {users.length === 0 && <p className="px-4 py-6 text-sm text-muted-foreground">No users found.</p>}
+              {users.map((u) => (
+                <div key={u.id} className="grid grid-cols-6 gap-3 px-4 py-3 text-sm">
+                  <span className="col-span-2 truncate" title={u.id}>
+                    {u.email}
+                  </span>
+                  <span className="text-muted-foreground">{formatDate(u.createdAt)}</span>
+                  <span>
+                    <Badge variant={u.onboardingCompleted ? "success" : "outline"}>
+                      {u.onboardingCompleted ? "Complete" : "Incomplete"}
+                    </Badge>
+                  </span>
+                  <span className="flex flex-col gap-1">
+                    <span>{planLabel(u.planId)}</span>
+                    {u.subscriptionStatus && (
+                      <span className="text-xs text-muted-foreground">{subscriptionStatusLabel(u.subscriptionStatus)}</span>
+                    )}
+                  </span>
+                  <span>{u.creditBalance ?? "—"}</span>
+                </div>
+              ))}
+              {users.length === 0 && <p className="px-4 py-6 text-sm text-muted-foreground">No users found.</p>}
+            </div>
           </div>
         </CardContent>
       </Card>

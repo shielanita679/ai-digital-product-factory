@@ -178,21 +178,14 @@ tracked in the PRE-LAUNCH checklist below.
 
 ## PRE-LAUNCH checklist
 
-**Custom SMTP / auth email flow:**
-- [ ] Configure a production SMTP provider in Supabase Auth settings
-- [ ] Customize the **Confirm signup** email template to:
-      `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/onboarding`
-- [ ] Customize the **Reset Password** email template to:
-      `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password`
-- [ ] Confirm Supabase Auth **Site URL** and **Redirect URLs** cover the production domain's `/auth/confirm`
-- [ ] Test a brand-new signup end-to-end (real inbox, real click)
-- [ ] Test the confirmation session handoff (lands authenticated on `/onboarding`, not the error page)
-- [ ] Test password reset end-to-end (real inbox, real click, new password accepted)
-- [ ] Verify the OLD password is rejected after reset
-- [ ] Verify the NEW password successfully logs in
-- [ ] Optional: type-specialize `/auth/auth-code-error` copy if a failure is still reachable (currently generic for both signup and recovery failures)
+Superseded by [`docs/PRE_LAUNCH_CHECKLIST.md`](./PRE_LAUNCH_CHECKLIST.md),
+the single authoritative pre-launch checklist (added in Phase 13) — covering
+this auth-email/migration list plus security, AI, Stripe, observability,
+legal/product, and operations items. Kept as one file going forward instead
+of duplicating/diverging copies across phase docs.
 
-**Phase 12 migration:**
-- [ ] Apply `supabase/migrations/20261010000000_add_admin_analytics_rate_limits_errors.sql` (SQL Editor or `supabase db push`)
-- [ ] Verify with: `select role from public.profiles limit 1;` and `select * from public.analytics_events limit 1;` (both should succeed, not error)
-- [ ] Grant the first admin: `update public.profiles set role = 'admin' where id = '<your-uuid>';`
+(Note: `/auth/auth-code-error`'s copy was type-specialized in Phase 13 —
+signup-confirmation and password-recovery failures now show different,
+accurate copy instead of one generic message for both. The underlying
+custom-SMTP/template dependency itself remains deferred; see the checklist
+above.)

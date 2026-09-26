@@ -72,7 +72,7 @@ export function RegisterForm() {
           <span className="mb-2 flex size-12 items-center justify-center rounded-2xl bg-brand-gradient text-white">
             <MailCheck className="size-6" />
           </span>
-          <CardTitle className="text-xl">Check your email</CardTitle>
+          <CardTitle as="h1" className="text-xl">Check your email</CardTitle>
           <CardDescription>
             We sent a confirmation link to <strong>{submittedEmail}</strong>.
             Click it to activate your account and get started.
@@ -97,7 +97,7 @@ export function RegisterForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Create your account</CardTitle>
+        <CardTitle as="h1" className="text-xl">Create your account</CardTitle>
         <CardDescription>
           Start turning ideas into sellable digital products.
         </CardDescription>
@@ -115,10 +115,11 @@ export function RegisterForm() {
               autoComplete="name"
               placeholder="Jamie Rivera"
               aria-invalid={!!errors.name}
+              aria-describedby="name-error"
               {...register("name")}
             />
             {errors.name && (
-              <p className="text-sm text-destructive">{errors.name.message}</p>
+              <p id="name-error" className="text-sm text-destructive">{errors.name.message}</p>
             )}
           </div>
 
@@ -130,10 +131,11 @@ export function RegisterForm() {
               autoComplete="email"
               placeholder="you@example.com"
               aria-invalid={!!errors.email}
+              aria-describedby="email-error"
               {...register("email")}
             />
             {errors.email && (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
+              <p id="email-error" className="text-sm text-destructive">{errors.email.message}</p>
             )}
           </div>
 
@@ -145,10 +147,11 @@ export function RegisterForm() {
               autoComplete="new-password"
               placeholder="••••••••"
               aria-invalid={!!errors.password}
+              aria-describedby="password-error"
               {...register("password")}
             />
             {errors.password && (
-              <p className="text-sm text-destructive">
+              <p id="password-error" className="text-sm text-destructive">
                 {errors.password.message}
               </p>
             )}
@@ -162,10 +165,11 @@ export function RegisterForm() {
               autoComplete="new-password"
               placeholder="••••••••"
               aria-invalid={!!errors.confirmPassword}
+              aria-describedby="confirmPassword-error"
               {...register("confirmPassword")}
             />
             {errors.confirmPassword && (
-              <p className="text-sm text-destructive">
+              <p id="confirmPassword-error" className="text-sm text-destructive">
                 {errors.confirmPassword.message}
               </p>
             )}
@@ -182,6 +186,7 @@ export function RegisterForm() {
                     checked={field.value}
                     onCheckedChange={field.onChange}
                     aria-invalid={!!errors.agreeToTerms}
+                    aria-describedby="agreeToTerms-error"
                   />
                 )}
               />
@@ -190,14 +195,14 @@ export function RegisterForm() {
               </Label>
             </div>
             {errors.agreeToTerms && (
-              <p className="text-sm text-destructive">
+              <p id="agreeToTerms-error" className="text-sm text-destructive">
                 {errors.agreeToTerms.message}
               </p>
             )}
           </div>
 
           {formError && (
-            <p className="text-sm text-destructive">{formError}</p>
+            <p role="alert" className="text-sm text-destructive">{formError}</p>
           )}
 
           <Button

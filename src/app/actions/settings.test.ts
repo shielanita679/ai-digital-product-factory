@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 type UpdatePayload = Record<string, unknown>;
 let lastUpdatePayload: UpdatePayload | null = null;
 let lastEqArgs: [string, unknown] | null = null;
-let updateError: { message: string } | null = null;
+let updateError: { message: string; code?: string } | null = null;
 
 const USER_ID = "55555555-5555-5555-5555-555555555555";
 const requireUser = vi.fn(async () => ({
@@ -76,6 +76,21 @@ describe("updateProfileSettingsAction — owner can update own allowed fields", 
     updateError = { message: "connection reset" };
     const result = await updateProfileSettingsAction(VALID_INPUT);
     expect(result).toEqual({ ok: false, error: "connection reset" });
+  });
+
+  // Phase 13 fix: this action previously returned the raw error.message
+  // directly instead of routing through friendlyDbErrorMessage (unlike
+  // every other action in the codebase) — a migration-not-applied error
+  // would have leaked a raw PostgREST schema-cache message instead of the
+  // established friendly copy.
+  it("shows the friendly migration-not-applied message for a PGRST205 error, not the raw PostgREST message", async () => {
+    updateError = { message: "Could not find the table 'public.profiles' in the schema cache", code: "PGRST205" };
+    const result = await updateProfileSettingsAction(VALID_INPUT);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/database migration.*hasn't been applied/i);
+      expect(result.error).not.toContain("schema cache");
+    }
   });
 });
 

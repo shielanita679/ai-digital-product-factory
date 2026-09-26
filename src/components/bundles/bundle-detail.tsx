@@ -210,10 +210,10 @@ function DesignRow({
                       </Button>
                       {mockup?.status === "completed" && (
                         <>
-                          <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => handleDownloadMockup(mockup.id)}>
+                          <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => handleDownloadMockup(mockup.id)} aria-label="Download mockup">
                             <Download className="size-3" />
                           </Button>
-                          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => handleRemoveMockup(mockup.id)}>
+                          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => handleRemoveMockup(mockup.id)} aria-label="Remove mockup">
                             <Trash2 className="size-3" />
                           </Button>
                         </>

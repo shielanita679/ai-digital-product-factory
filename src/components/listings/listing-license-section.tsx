@@ -155,6 +155,7 @@ function TagEditor({
             size="sm"
             onClick={addTag}
             disabled={disabled || !draft.trim()}
+            aria-label={`Add ${label.toLowerCase().replace(/s$/, "")}`}
           >
             <Plus className="size-3.5" />
           </Button>
