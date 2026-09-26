@@ -22,6 +22,13 @@ vi.mock("@/lib/stripe/stripe-client", () => ({
   },
 }));
 
+// Phase 12: customer.subscription.created now fires
+// AnalyticsService.track("subscription_activated"), which creates its own
+// service-role client internally — mocked here purely so this file makes
+// ZERO real Supabase network calls (AnalyticsService already fails
+// safe/swallows when the client doesn't behave like a real one).
+vi.mock("@/lib/supabase/service-role", () => ({ createServiceRoleClient: () => ({}) }));
+
 const { processWebhookEvent, verifyWebhookSignature, WebhookServiceError } = await import("@/lib/stripe/webhook-service");
 const { StripeNotConfiguredError, StripeLiveModeRejectedError } = await import("@/lib/stripe/stripe-env");
 

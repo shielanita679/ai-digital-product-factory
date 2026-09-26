@@ -15,6 +15,13 @@ vi.mock("next/cache", () => ({ revalidatePath }));
 const requireUser = vi.fn(async () => ({ supabase: {}, user: { id: "55555555-5555-5555-5555-555555555555" } }));
 vi.mock("@/lib/supabase/current-user", () => ({ requireUser }));
 
+// Phase 12: generateMockupsAction now calls enforceRateLimit()/
+// AnalyticsService.track() internally, both of which create their own
+// service-role client — mocked here purely so this test file makes ZERO
+// real Supabase network calls (both functions fail safe/swallow when the
+// client doesn't behave like a real one).
+vi.mock("@/lib/supabase/service-role", () => ({ createServiceRoleClient: () => ({}) }));
+
 const generateMockups = vi.fn(async () => ({ results: [], projectId: "33333333-3333-3333-3333-333333333333" }));
 const deleteMockup = vi.fn(async () => ({ projectId: "33333333-3333-3333-3333-333333333333", bundleId: "11111111-1111-1111-1111-111111111111" }));
 const getMockupDownloadUrl = vi.fn(async () => ({ url: "https://example.com/x", filename: "x.png" }));

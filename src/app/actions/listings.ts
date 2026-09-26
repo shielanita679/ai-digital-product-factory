@@ -13,6 +13,7 @@ import {
   updateLicenseTextSchema,
   resetLicenseSchema,
 } from "@/lib/validations/listing";
+import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit/rate-limiter";
 import type { ActionResult } from "@/app/actions/projects";
 
 function firstIssueMessage(error: { issues: { message: string }[] }, fallback: string) {
@@ -38,6 +39,7 @@ export async function generateListingAction(input: unknown): Promise<GenerateLis
 
   const { supabase, user } = await requireUser();
   try {
+    await enforceRateLimit(user.id, "listing_generation");
     const result = await generateListing({ supabase, userId: user.id }, parsed.data.bundleId, parsed.data.marketplace, {
       confirmOverwriteEdits: parsed.data.confirmOverwriteEdits,
     });
@@ -45,6 +47,7 @@ export async function generateListingAction(input: unknown): Promise<GenerateLis
     revalidateListingPaths(bundle?.project_id, parsed.data.bundleId);
     return { ok: true, data: result };
   } catch (err) {
+    if (err instanceof RateLimitError) return { ok: false, error: err.message };
     if (err instanceof ListingServiceError) {
       if (err.code === "edit_protected") return { ok: false, error: err.message, code: "edit_protected" };
       return { ok: false, error: err.message };
@@ -61,6 +64,7 @@ export async function regenerateListingSectionAction(input: unknown): Promise<Re
 
   const { supabase, user } = await requireUser();
   try {
+    await enforceRateLimit(user.id, "listing_generation");
     const { data: listing } = await supabase.from("product_listings").select("bundle_id").eq("id", parsed.data.id).single();
     await regenerateListingSection({ supabase, userId: user.id }, parsed.data.id, parsed.data.section, {
       confirmOverwriteEdits: parsed.data.confirmOverwriteEdits,
@@ -69,6 +73,7 @@ export async function regenerateListingSectionAction(input: unknown): Promise<Re
     revalidateListingPaths(bundle?.project_id, listing?.bundle_id);
     return { ok: true, data: undefined };
   } catch (err) {
+    if (err instanceof RateLimitError) return { ok: false, error: err.message };
     if (err instanceof ListingServiceError) {
       if (err.code === "edit_protected") return { ok: false, error: err.message, code: "edit_protected" };
       return { ok: false, error: err.message };
@@ -107,6 +112,7 @@ export async function generateLicenseAction(input: unknown): Promise<GenerateLic
 
   const { supabase, user } = await requireUser();
   try {
+    await enforceRateLimit(user.id, "listing_generation");
     const { data: listing } = await supabase.from("product_listings").select("bundle_id").eq("id", parsed.data.id).single();
     await generateLicense({ supabase, userId: user.id }, parsed.data.id, parsed.data.licenseType, {
       confirmOverwriteEdits: parsed.data.confirmOverwriteEdits,
@@ -115,6 +121,7 @@ export async function generateLicenseAction(input: unknown): Promise<GenerateLic
     revalidateListingPaths(bundle?.project_id, listing?.bundle_id);
     return { ok: true, data: undefined };
   } catch (err) {
+    if (err instanceof RateLimitError) return { ok: false, error: err.message };
     if (err instanceof LicenseServiceError) {
       if (err.code === "edit_protected") return { ok: false, error: err.message, code: "edit_protected" };
       return { ok: false, error: err.message };

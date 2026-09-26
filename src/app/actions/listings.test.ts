@@ -36,6 +36,14 @@ function makeSupabaseStub() {
 const requireUser = vi.fn(async () => ({ supabase: makeSupabaseStub(), user: { id: "55555555-5555-5555-5555-555555555555" } }));
 vi.mock("@/lib/supabase/current-user", () => ({ requireUser }));
 
+// Phase 12: generateListingAction/generateLicenseAction now call
+// enforceRateLimit()/AnalyticsService.track() internally, both of which
+// create their own service-role client — mocked here purely so this test
+// file makes ZERO real Supabase network calls (both functions already
+// fail safe/swallow when the client doesn't behave like a real one; see
+// their own doc comments).
+vi.mock("@/lib/supabase/service-role", () => ({ createServiceRoleClient: () => ({}) }));
+
 const generateListing = vi.fn(async () => ({ listingId: LISTING_ID }));
 const regenerateListingSectionFn = vi.fn(async () => undefined);
 const updateListingFn = vi.fn(async () => undefined);

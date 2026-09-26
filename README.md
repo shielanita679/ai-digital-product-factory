@@ -49,6 +49,13 @@ npm run start   # run the production build
 npm run lint    # lint the project
 ```
 
+## Documentation
+
+- [`docs/PHASE_12.md`](./docs/PHASE_12.md) — Settings, Admin authorization
+  model (and how to safely grant/revoke it), the analytics event catalog,
+  rate-limit configuration, error-reporting architecture, and the
+  pre-launch checklist (including the deferred custom-SMTP auth task).
+
 ## Environment Variables
 
 See `.env.example` for the full list of variables the app will eventually

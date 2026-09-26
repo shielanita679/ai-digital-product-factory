@@ -36,6 +36,7 @@ export function DashboardShell({
   initials,
   onSignOut,
   creditBalance,
+  isAdmin,
   children,
 }: {
   email: string;
@@ -43,6 +44,8 @@ export function DashboardShell({
   onSignOut: () => Promise<void>;
   /** null when Phase 11 billing isn't configured/migrated yet — the server remains authoritative; this is display-only, never used for enforcement here. */
   creditBalance: number | null;
+  /** Cosmetic only — see DashboardNavItem.adminOnly's own comment. */
+  isAdmin?: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -54,7 +57,7 @@ export function DashboardShell({
           <Logo />
         </div>
         <div className="mt-6 flex flex-1 flex-col">
-          <SidebarNav />
+          <SidebarNav isAdmin={isAdmin} />
         </div>
         <LogOutButton onSignOut={onSignOut} />
       </aside>
@@ -74,7 +77,7 @@ export function DashboardShell({
                     <Logo />
                   </SheetTitle>
                 </SheetHeader>
-                <SidebarNav onNavigate={() => setOpen(false)} />
+                <SidebarNav onNavigate={() => setOpen(false)} isAdmin={isAdmin} />
                 <LogOutButton onSignOut={onSignOut} />
               </SheetContent>
             </Sheet>

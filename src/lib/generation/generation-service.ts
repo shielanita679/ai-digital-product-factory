@@ -14,6 +14,7 @@ import type { ContentMode, ColorMode, Orientation } from "@/config/design-option
 import { isMigrationNotAppliedError, friendlyDbErrorMessage } from "@/lib/supabase/db-error";
 import { DesignStorage } from "@/lib/storage/design-storage";
 import { recomputeBundleItemCount, recomputeBundleMockupCount } from "@/lib/bundles/bundle-service";
+import { AnalyticsService } from "@/lib/analytics/analytics-service";
 
 /**
  * The generation pipeline's "future async boundary": every function here
@@ -306,6 +307,8 @@ export async function startGenerationJob(
     throw new GenerationServiceError(friendlyDbErrorMessage(jobError, "Could not start generation."), "db_error");
   }
 
+  void AnalyticsService.track({ eventName: "generation_started", userId: ctx.userId, projectId, metadata: { jobId: job.id, requestedCount: prompts.length } });
+
   const { data: designRows, error: designInsertError } = await ctx.supabase
     .from("designs")
     .insert(
@@ -387,6 +390,13 @@ export async function startGenerationJob(
       error_message: finalStatus === "failed" ? "All designs failed to generate." : null,
     })
     .eq("id", job.id);
+
+  void AnalyticsService.track({
+    eventName: "generation_completed",
+    userId: ctx.userId,
+    projectId,
+    metadata: { jobId: job.id, status: finalStatus, completedCount, failedCount },
+  });
 
   await recomputeProjectDesignCount(ctx.supabase, projectId);
 

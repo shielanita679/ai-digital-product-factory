@@ -24,6 +24,7 @@ export type Database = {
           sells_where: string[] | null;
           monthly_product_volume: string | null;
           onboarding_completed: boolean;
+          role: string;
           created_at: string;
           updated_at: string;
         };
@@ -36,6 +37,7 @@ export type Database = {
           sells_where?: string[] | null;
           monthly_product_volume?: string | null;
           onboarding_completed?: boolean;
+          role?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -48,6 +50,7 @@ export type Database = {
           sells_where?: string[] | null;
           monthly_product_volume?: string | null;
           onboarding_completed?: boolean;
+          role?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -1040,6 +1043,84 @@ export type Database = {
         };
         Relationships: [];
       };
+      analytics_events: {
+        Row: {
+          id: string;
+          user_id: string;
+          project_id: string | null;
+          event_name: string;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          project_id?: string | null;
+          event_name: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          project_id?: string | null;
+          event_name?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      rate_limits: {
+        Row: {
+          user_id: string;
+          operation: string;
+          window_start: string;
+          count: number;
+        };
+        Insert: {
+          user_id: string;
+          operation: string;
+          window_start: string;
+          count?: number;
+        };
+        Update: {
+          user_id?: string;
+          operation?: string;
+          window_start?: string;
+          count?: number;
+        };
+        Relationships: [];
+      };
+      application_errors: {
+        Row: {
+          id: string;
+          level: string;
+          message: string;
+          context: Json;
+          route: string | null;
+          user_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          level: string;
+          message: string;
+          context?: Json;
+          route?: string | null;
+          user_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          level?: string;
+          message?: string;
+          context?: Json;
+          route?: string | null;
+          user_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -1055,6 +1136,15 @@ export type Database = {
           p_metadata?: Json;
         };
         Returns: { ledger_id: string; balance: number; was_duplicate: boolean }[];
+      };
+      check_rate_limit: {
+        Args: {
+          p_user_id: string;
+          p_operation: string;
+          p_window_seconds: number;
+          p_max_requests: number;
+        };
+        Returns: { allowed: boolean; current_count: number; reset_at: string }[];
       };
     };
     Enums: Record<string, never>;
@@ -1077,3 +1167,6 @@ export type CreditLedgerEntry = Database["public"]["Tables"]["credit_ledger"]["R
 export type Subscription = Database["public"]["Tables"]["subscriptions"]["Row"];
 export type StripeWebhookEvent = Database["public"]["Tables"]["stripe_webhook_events"]["Row"];
 export type StripeCustomerMapping = Database["public"]["Tables"]["stripe_customers"]["Row"];
+export type AnalyticsEvent = Database["public"]["Tables"]["analytics_events"]["Row"];
+export type RateLimitRow = Database["public"]["Tables"]["rate_limits"]["Row"];
+export type ApplicationError = Database["public"]["Tables"]["application_errors"]["Row"];

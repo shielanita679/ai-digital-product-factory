@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { verifyWebhookSignature, processWebhookEvent, WebhookServiceError } from "@/lib/stripe/webhook-service";
 import { StripeNotConfiguredError, StripeLiveModeRejectedError } from "@/lib/stripe/stripe-env";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { ErrorReporter } from "@/lib/errors/error-reporter";
 
 /**
  * Stripe webhook endpoint. Reads the RAW request body (req.text(), never
@@ -43,6 +44,10 @@ export async function POST(request: Request): Promise<Response> {
   const result = await processWebhookEvent(supabase, event);
 
   if (result.outcome === "failed") {
+    ErrorReporter.captureMessage("Stripe webhook processing failed", {
+      route: "api/stripe/webhook",
+      metadata: { eventType: event.type, error: result.error },
+    });
     return NextResponse.json({ error: result.error ?? "Webhook processing failed." }, { status: 500 });
   }
   return NextResponse.json({ received: true, outcome: result.outcome });

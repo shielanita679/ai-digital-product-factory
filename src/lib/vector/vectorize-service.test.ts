@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Phase 12: vectorizeDesign now calls AnalyticsService.track() on success,
+// which creates its own service-role client internally — mocked here
+// purely so this file makes ZERO real Supabase network calls
+// (AnalyticsService already fails safe/swallows when the client doesn't
+// behave like a real one).
+vi.mock("@/lib/supabase/service-role", () => ({ createServiceRoleClient: () => ({}) }));
+
 import {
   vectorizeDesign,
   getVectorizationForDesign,

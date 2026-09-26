@@ -6,6 +6,7 @@ import { getStripeClient } from "@/lib/stripe/stripe-client";
 import { getStripeEnv } from "@/lib/stripe/stripe-env";
 import { getPlanIdForPriceId, getMonthlyCreditsForPriceId } from "@/config/plans";
 import { grantCredits } from "@/lib/credits/credit-service";
+import { AnalyticsService } from "@/lib/analytics/analytics-service";
 
 export type WebhookServiceErrorCode = "not_configured" | "invalid_signature" | "missing_signature";
 
@@ -221,7 +222,15 @@ async function dispatchEvent(supabase: SupabaseClient<Database>, event: Stripe.E
       // final persisted state independent of delivery order: whichever
       // event is processed, the fetch always returns whatever is
       // CURRENTLY true, so the write can never be staler than reality.
-      await syncSubscriptionFresh(supabase, event.data.object.id);
+      const synced = await syncSubscriptionFresh(supabase, event.data.object.id);
+      // subscription_activated is tracked only on first activation
+      // (customer.subscription.created) — not on every subsequent update
+      // (e.g. cancellation scheduling), which would misrepresent it as a
+      // repeat activation. See docs/PHASE_12.md's analytics catalog for
+      // this documented scope.
+      if (synced && event.type === "customer.subscription.created") {
+        void AnalyticsService.track({ eventName: "subscription_activated", userId: synced.userId, metadata: { subscriptionId: event.data.object.id } });
+      }
       return;
     }
     case "customer.subscription.deleted": {

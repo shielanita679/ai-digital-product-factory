@@ -12,6 +12,8 @@ import {
   type PrerequisiteCheck,
 } from "@/lib/packages/package-service";
 import { buildPackageSchema, packageIdSchema, checkPackagePrerequisitesSchema } from "@/lib/validations/package";
+import { AnalyticsService } from "@/lib/analytics/analytics-service";
+import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit/rate-limiter";
 import type { ActionResult } from "@/app/actions/projects";
 
 function firstIssueMessage(error: { issues: { message: string }[] }, fallback: string) {
@@ -45,11 +47,19 @@ export async function buildPackageAction(input: unknown): Promise<ActionResult<{
 
   const { supabase, user } = await requireUser();
   try {
+    await enforceRateLimit(user.id, "package_generation");
     const { data: bundle } = await supabase.from("product_bundles").select("project_id").eq("id", parsed.data.bundleId).single();
     const result = await buildPackage({ supabase, userId: user.id }, parsed.data.bundleId, parsed.data.marketplace);
+    void AnalyticsService.track({
+      eventName: "package_created",
+      userId: user.id,
+      projectId: bundle?.project_id ?? null,
+      metadata: { packageId: result.packageId, marketplace: parsed.data.marketplace },
+    });
     revalidatePackagePaths(bundle?.project_id, parsed.data.bundleId);
     return { ok: true, data: result };
   } catch (err) {
+    if (err instanceof RateLimitError) return { ok: false, error: err.message };
     if (err instanceof PackageServiceError) return { ok: false, error: err.message };
     return { ok: false, error: "Could not build the package. Please try again." };
   }
@@ -77,6 +87,7 @@ export async function getPackageDownloadUrlAction(input: unknown): Promise<Actio
   const { supabase, user } = await requireUser();
   try {
     const result = await getPackageDownloadUrl({ supabase, userId: user.id }, parsed.data.id);
+    void AnalyticsService.track({ eventName: "package_downloaded", userId: user.id, metadata: { packageId: parsed.data.id } });
     return { ok: true, data: result };
   } catch (err) {
     if (err instanceof PackageServiceError) return { ok: false, error: err.message };

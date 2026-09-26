@@ -8,6 +8,7 @@ import type { MarketplaceId } from "@/config/marketplaces";
 import { getMarketplaceLimits } from "@/config/marketplaces";
 import { generateListingContent, generateListingSection, ListingGenerationServiceError } from "@/lib/listings/listing-generation-service";
 import { normalizeTagList, type ListingSection } from "@/lib/validations/listing";
+import { AnalyticsService } from "@/lib/analytics/analytics-service";
 
 export type ListingContext = {
   supabase: SupabaseClient<Database>;
@@ -139,6 +140,7 @@ export async function generateListing(ctx: ListingContext, bundleId: string, mar
         .eq("id", existing.id)
         .eq("user_id", ctx.userId);
       if (error) throw new ListingServiceError(friendlyDbErrorMessage(error, "Could not save the generated listing."), "db_error");
+      void AnalyticsService.track({ eventName: "listing_generated", userId: ctx.userId, projectId: bundle.project_id, metadata: { bundleId, marketplace } });
       return { listingId: existing.id };
     }
 
@@ -149,6 +151,7 @@ export async function generateListing(ctx: ListingContext, bundleId: string, mar
         isMigrationNotAppliedError(error) ? "migration_not_applied" : "db_error",
       );
     }
+    void AnalyticsService.track({ eventName: "listing_generated", userId: ctx.userId, projectId: bundle.project_id, metadata: { bundleId, marketplace } });
     return { listingId: data.id };
   } catch (err) {
     if (err instanceof ListingGenerationServiceError) {

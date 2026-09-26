@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/supabase/current-user";
 import { onboardingSchema } from "@/lib/validations/onboarding";
+import { AnalyticsService } from "@/lib/analytics/analytics-service";
 
 export type SaveOnboardingResult = { ok: true } | { ok: false; error: string };
 
@@ -32,6 +33,8 @@ export async function saveOnboardingAction(input: unknown): Promise<SaveOnboardi
   if (error) {
     return { ok: false, error: error.message };
   }
+
+  void AnalyticsService.track({ eventName: "onboarding_completed", userId: user.id });
 
   revalidatePath("/dashboard");
   redirect("/dashboard");

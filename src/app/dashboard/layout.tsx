@@ -71,6 +71,7 @@ export default async function DashboardLayout({
       initials={getInitials(profile?.full_name, user.email ?? "")}
       onSignOut={signOutAction}
       creditBalance={creditBalance}
+      isAdmin={profile?.role === "admin"}
     >
       {children}
     </DashboardShell>

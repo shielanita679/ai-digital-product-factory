@@ -11,6 +11,7 @@ import {
 } from "@/lib/validations/project";
 import { wizardConfigSchema } from "@/lib/validations/wizard";
 import { cleanupProjectStorage } from "@/lib/generation/generation-service";
+import { AnalyticsService } from "@/lib/analytics/analytics-service";
 import type { Project } from "@/types/supabase";
 
 export type ActionResult<T = undefined> =
@@ -74,6 +75,8 @@ export async function createProjectFromWizardAction(
   if (error || !data) {
     return { ok: false, error: friendlyDbErrorMessage(error, "Could not create the product.") };
   }
+
+  void AnalyticsService.track({ eventName: "project_created", userId: user.id, projectId: data.id });
 
   revalidateProductPaths();
   return { ok: true, data };

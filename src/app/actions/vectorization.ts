@@ -10,6 +10,7 @@ import {
   VectorizationServiceError,
 } from "@/lib/vector/vectorize-service";
 import { designIdSchema } from "@/lib/validations/generation";
+import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit/rate-limiter";
 import type { ActionResult } from "@/app/actions/projects";
 
 function firstIssueMessage(error: { issues: { message: string }[] }, fallback: string) {
@@ -32,10 +33,14 @@ export async function vectorizeDesignAction(input: unknown): Promise<ActionResul
   const { supabase, user } = await requireUser();
 
   try {
+    await enforceRateLimit(user.id, "vectorization");
     const result = await vectorizeDesign({ supabase, userId: user.id }, parsed.data.id);
     revalidateVectorizationPaths();
     return { ok: true, data: result };
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return { ok: false, error: err.message };
+    }
     if (err instanceof VectorizationServiceError) {
       return { ok: false, error: err.message };
     }

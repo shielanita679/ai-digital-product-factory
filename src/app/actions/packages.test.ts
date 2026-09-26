@@ -36,6 +36,13 @@ function makeSupabaseStub() {
 const requireUser = vi.fn(async () => ({ supabase: makeSupabaseStub(), user: { id: "55555555-5555-5555-5555-555555555555" } }));
 vi.mock("@/lib/supabase/current-user", () => ({ requireUser }));
 
+// Phase 12: buildPackageAction/getPackageDownloadUrlAction now call
+// enforceRateLimit()/AnalyticsService.track() internally, both of which
+// create their own service-role client — mocked here purely so this test
+// file makes ZERO real Supabase network calls (both functions fail
+// safe/swallow when the client doesn't behave like a real one).
+vi.mock("@/lib/supabase/service-role", () => ({ createServiceRoleClient: () => ({}) }));
+
 const buildPackageFn = vi.fn(async () => ({ packageId: PACKAGE_ID }));
 const deletePackageFn = vi.fn(async () => ({ projectId: PROJECT_ID, bundleId: BUNDLE_ID }));
 const getPackageDownloadUrlFn = vi.fn(async () => ({ url: "https://signed.example/x.zip", filename: "x.zip" }));

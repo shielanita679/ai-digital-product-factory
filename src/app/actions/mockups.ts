@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/current-user";
 import { generateMockups, deleteMockup, getMockupDownloadUrl, MockupServiceError } from "@/lib/bundles/mockup-service";
 import { generateMockupsSchema, mockupIdSchema } from "@/lib/validations/bundle";
+import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit/rate-limiter";
 import type { ActionResult } from "@/app/actions/projects";
 
 function firstIssueMessage(error: { issues: { message: string }[] }, fallback: string) {
@@ -25,10 +26,12 @@ export async function generateMockupsAction(
 
   const { supabase, user } = await requireUser();
   try {
+    await enforceRateLimit(user.id, "mockup_generation");
     const { results, projectId } = await generateMockups({ supabase, userId: user.id }, parsed.data.bundleId, parsed.data.designId, parsed.data.templateTypes);
     revalidateMockupPaths(projectId, parsed.data.bundleId);
     return { ok: true, data: { results } };
   } catch (err) {
+    if (err instanceof RateLimitError) return { ok: false, error: err.message };
     if (err instanceof MockupServiceError) return { ok: false, error: err.message };
     return { ok: false, error: "Could not generate mockups. Please try again." };
   }

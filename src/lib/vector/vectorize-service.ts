@@ -5,6 +5,7 @@ import { isMigrationNotAppliedError, friendlyDbErrorMessage } from "@/lib/supaba
 import { DesignStorage } from "@/lib/storage/design-storage";
 import { getVectorProvider } from "@/lib/vector/vector-provider-registry";
 import { validateAndSanitizeSvg, type SvgRejectionCode } from "@/lib/vector/svg-validate";
+import { AnalyticsService } from "@/lib/analytics/analytics-service";
 
 /**
  * Mirrors GenerationContext in generation-service.ts: an explicit
@@ -282,6 +283,13 @@ export async function vectorizeDesign(
     await markFailed(ctx, vectorizationId, "The vector was created but could not be saved to storage. You can retry.");
     throw new VectorizationServiceError("The vector was created but could not be saved to storage. You can retry.", "storage_error");
   }
+
+  void AnalyticsService.track({
+    eventName: "vectorization_completed",
+    userId: ctx.userId,
+    projectId: design.project_id,
+    metadata: { designId: design.id, vectorizationId },
+  });
 
   return { vectorizationId };
 }

@@ -11,6 +11,7 @@ import {
 import { startGenerationJobWithCredits } from "@/lib/generation/generation-billing";
 import { DesignStorage } from "@/lib/storage/design-storage";
 import { startGenerationSchema, designIdSchema } from "@/lib/validations/generation";
+import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit/rate-limiter";
 import type { ActionResult } from "@/app/actions/projects";
 
 function firstIssueMessage(error: { issues: { message: string }[] }, fallback: string) {
@@ -32,10 +33,14 @@ export async function startGenerationAction(input: unknown): Promise<ActionResul
   const { supabase, user } = await requireUser();
 
   try {
+    await enforceRateLimit(user.id, "image_generation");
     const result = await startGenerationJobWithCredits({ supabase, userId: user.id }, parsed.data.projectId);
     revalidateGenerationPaths(parsed.data.projectId);
     return { ok: true, data: result };
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return { ok: false, error: err.message };
+    }
     if (err instanceof GenerationServiceError) {
       return { ok: false, error: err.message };
     }
@@ -52,10 +57,14 @@ export async function retryDesignAction(input: unknown): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
 
   try {
+    await enforceRateLimit(user.id, "image_generation");
     await retryDesign({ supabase, userId: user.id }, parsed.data.id);
     revalidateGenerationPaths();
     return { ok: true, data: undefined };
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return { ok: false, error: err.message };
+    }
     if (err instanceof GenerationServiceError) {
       return { ok: false, error: err.message };
     }

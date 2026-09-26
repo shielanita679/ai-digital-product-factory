@@ -13,6 +13,7 @@ import {
   BundleServiceError,
 } from "@/lib/bundles/bundle-service";
 import { createBundleSchema, bundleIdSchema, renameBundleSchema, setBundleItemSchema, removeBundleItemSchema } from "@/lib/validations/bundle";
+import { AnalyticsService } from "@/lib/analytics/analytics-service";
 import type { ActionResult } from "@/app/actions/projects";
 
 function firstIssueMessage(error: { issues: { message: string }[] }, fallback: string) {
@@ -32,6 +33,7 @@ export async function createBundleAction(input: unknown): Promise<ActionResult<{
   const { supabase, user } = await requireUser();
   try {
     const result = await createBundle({ supabase, userId: user.id }, parsed.data.projectId, parsed.data.name);
+    void AnalyticsService.track({ eventName: "bundle_created", userId: user.id, projectId: parsed.data.projectId, metadata: { bundleId: result.bundleId } });
     revalidateBundlePaths(parsed.data.projectId);
     return { ok: true, data: result };
   } catch (err) {

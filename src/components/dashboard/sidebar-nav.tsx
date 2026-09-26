@@ -7,12 +7,14 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { dashboardNav } from "@/config/dashboard-nav";
 
-export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+export function SidebarNav({ onNavigate, isAdmin }: { onNavigate?: () => void; isAdmin?: boolean }) {
   const pathname = usePathname();
 
   return (
     <nav className="flex flex-1 flex-col gap-1">
-      {dashboardNav.map((item) => {
+      {dashboardNav
+        .filter((item) => !item.adminOnly || isAdmin)
+        .map((item) => {
         const Icon = item.icon;
         const isActive =
           item.href === "/dashboard"

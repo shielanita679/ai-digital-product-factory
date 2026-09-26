@@ -10,6 +10,7 @@ import {
   Coins,
   CreditCard,
   Settings,
+  ShieldCheck,
 } from "lucide-react";
 
 export type DashboardNavItem = {
@@ -18,6 +19,14 @@ export type DashboardNavItem = {
   icon: LucideIcon;
   /** Route isn't built yet — rendered disabled with a "Soon" badge. */
   comingSoon?: boolean;
+  /**
+   * Cosmetic only — hides the link for non-admins so the sidebar isn't
+   * cluttered with a link that would just redirect. This is NEVER the
+   * authorization boundary: /admin/* pages independently re-verify
+   * profiles.role server-side via requireAdmin() regardless of whether
+   * this link was ever shown (see src/lib/auth/admin.ts).
+   */
+  adminOnly?: boolean;
 };
 
 export const dashboardNav: DashboardNavItem[] = [
@@ -30,5 +39,6 @@ export const dashboardNav: DashboardNavItem[] = [
   { label: "Templates", href: "/dashboard/templates", icon: LayoutTemplate, comingSoon: true },
   { label: "Credits", href: "/dashboard/credits", icon: Coins, comingSoon: true },
   { label: "Billing", href: "/dashboard/billing", icon: CreditCard },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings, comingSoon: true },
+  { label: "Settings", href: "/dashboard/settings", icon: Settings },
+  { label: "Admin", href: "/admin", icon: ShieldCheck, adminOnly: true },
 ];
