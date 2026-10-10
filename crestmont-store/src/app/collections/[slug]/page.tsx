@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: PageProps<"/collections/[slug
     title: collection.name,
     description: `${collection.description} Shop the ${collection.name} collection at ${business.brandName}.`,
     path: `/collections/${slug}`,
-    image: collection.image.src.endsWith(".svg") ? undefined : collection.image.src,
+    image: collection.image?.src,
   });
 }
 

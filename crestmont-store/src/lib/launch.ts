@@ -1,6 +1,7 @@
 import { business } from "@/config/business";
 import { commerce } from "@/config/commerce";
 import { products } from "@/catalog/products";
+import { activationIssues, getPurchasableProducts } from "@/lib/catalog";
 
 /**
  * Lists every business term or setting that must be confirmed before the
@@ -34,16 +35,23 @@ export function getLaunchIssues(): string[] {
     issues.push("No contact-form delivery is configured (RESEND_API_KEY or CONTACT_WEBHOOK_URL).");
   }
 
-  const samples = products.filter((p) => p.status === "active" && p.sample);
-  if (samples.length > 0) {
-    issues.push(`${samples.length} active product(s) are still sample catalog entries (catalog/products.ts).`);
+  // Catalog: every storefront product must be fully specified before launch.
+  for (const p of products) {
+    if (p.status === "draft" || p.status === "archived") continue;
+    const missing = activationIssues(p);
+    if (p.status === "active" && missing.length > 0) {
+      issues.push(`${p.name} is marked active but cannot be sold until fixed: ${missing.join("; ")}.`);
+    } else if (p.status === "coming_soon") {
+      issues.push(`${p.name} (${p.skuPrefix}) is coming soon. Needs: ${p.pendingData.join("; ") || missing.join("; ")}.`);
+    }
   }
-  const imagesArePlaceholders = products.some((p) => p.status === "active" && p.images.some((i) => i.src.endsWith(".svg")));
-  if (imagesArePlaceholders) issues.push("Product images are still placeholder artwork; replace with product photography.");
 
   const skus = products.flatMap((p) => p.variants.map((v) => v.sku));
   const dupes = skus.filter((s, i) => skus.indexOf(s) !== i);
   if (dupes.length) issues.push(`Duplicate SKUs: ${[...new Set(dupes)].join(", ")}`);
+  const prefixes = products.map((p) => p.skuPrefix);
+  const dupePrefixes = prefixes.filter((s, i) => prefixes.indexOf(s) !== i);
+  if (dupePrefixes.length) issues.push(`Duplicate SKU prefixes: ${[...new Set(dupePrefixes)].join(", ")}`);
 
   return issues;
 }
@@ -57,6 +65,7 @@ export function getCheckoutBlockers(): string[] {
   if (!commerce.domesticDeliveryEstimate) issues.push("Domestic delivery estimate is not set (config/commerce.ts).");
   if (commerce.returns.windowDays === null) issues.push("Return window is not set (config/commerce.ts).");
   if (!business.supportEmail) issues.push("Support email is not set.");
+  if (getPurchasableProducts().length === 0) issues.push("No products are available for purchase yet (all are draft or coming soon).");
   return issues;
 }
 

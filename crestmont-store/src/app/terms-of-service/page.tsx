@@ -35,7 +35,7 @@ export default function TermsPage() {
 
       <h2>3. Products</h2>
       <p>
-        We try to describe and photograph products accurately, including materials, dimensions and care instructions. Natural materials such as wood, stoneware, linen and canvas vary, and colors may look different on different screens, so items may differ slightly from their images. Products are for household use as described; please follow any included care and use instructions.
+        We try to describe and photograph products accurately, including materials, dimensions and care instructions. Colors may look different on different screens, and some materials vary naturally, so items may differ slightly from their images. Products shown as &ldquo;Coming soon&rdquo; are not yet offered for sale. Products are for household use as described; please follow any included care and use instructions.
       </p>
 
       <h2>4. Pricing</h2>

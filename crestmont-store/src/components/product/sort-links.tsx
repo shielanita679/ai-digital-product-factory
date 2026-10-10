@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { SortKey } from "@/lib/catalog";
 
 export const sorts: { value: SortKey; label: string }[] = [
-  { value: "featured", label: "Featured" },
+  { value: "featured", label: "Default" },
   { value: "price-asc", label: "Price, low to high" },
   { value: "price-desc", label: "Price, high to low" },
   { value: "name", label: "Name, A–Z" },

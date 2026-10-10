@@ -34,7 +34,7 @@ export function priceCart(lines: CartLine[]): { ok: true; lines: PricedLine[]; s
       variant: variantLabel(variant),
       unitAmountCents: variant.priceCents,
       quantity,
-      image: product.images[variant.imageIndex ?? 0]?.src ?? product.images[0].src,
+      image: product.images[variant.imageIndex ?? 0]?.src ?? product.images[0]?.src ?? "",
     });
   }
   const subtotalCents = priced.reduce((s, l) => s + l.unitAmountCents * l.quantity, 0);

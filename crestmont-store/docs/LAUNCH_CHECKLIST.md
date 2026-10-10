@@ -31,19 +31,22 @@ Enter only terms you can actually meet.
 
 ## 2. Catalog (`src/catalog/products.ts`)
 
-- [ ] Replace the 12 sample products (all flagged `sample: true`) with your real
-      merchandise. Verify every material, dimension, capacity and care
-      instruction against the physical product. Make no health, safety,
-      environmental or performance claims you can't document.
-- [ ] Replace the placeholder SVG artwork in `public/images/` with real
-      photography (JPG/PNG/WebP, 4:5 ratio recommended for products).
+- [ ] The 12 planned products are `coming_soon`. For each, supply every item in
+      its `pendingData` list from the actual product/supplier documentation,
+      add variants with full SKUs (starting with its `skuPrefix`) and verified
+      inventory, then set `status: "active"`. Make no health, safety,
+      electrical, environmental or performance claims you can't document.
+- [ ] Add real product photography under `public/images/products/<slug>/`
+      (JPG/PNG/WebP, 4:5 ratio recommended). Until then pages show a plain
+      "Photography coming soon" panel, never stand-in images.
 - [ ] Set real inventory counts. Inventory is not decremented automatically —
       connect the Stripe webhook (`src/app/api/stripe/webhook/route.ts`) to
       your inventory/fulfillment system, or update counts manually.
 - [ ] Only set `compareAtPriceCents` if the product genuinely sold at that
       price for a meaningful period (FTC guidance on former-price comparisons).
-- [ ] The home page section "Everyday essentials" is merchandising, not a sales
-      claim. Don't relabel it "Best sellers" without real sales data.
+- [ ] Don't label anything "Best seller", "Popular" or similar without real
+      sales data. "Shop new arrivals" appears on the home page automatically
+      only once at least one product is purchasable.
 - [ ] Do not add ratings or reviews unless they come from real customers.
 
 ## 3. Environment variables (see `.env.example`)

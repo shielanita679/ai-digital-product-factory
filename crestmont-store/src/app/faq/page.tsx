@@ -34,6 +34,10 @@ export default function FaqPage() {
           ),
         },
         {
+          q: "What does “Coming soon” mean?",
+          a: <>The product is being prepared for launch and can&rsquo;t be ordered yet. Its full details and photography will be published on the product page before it goes on sale.</>,
+        },
+        {
           q: "Where can I find my order number?",
           a: <>It&rsquo;s shown on the confirmation page after payment and in your confirmation email. Order numbers start with &ldquo;CH-&rdquo;.</>,
         },

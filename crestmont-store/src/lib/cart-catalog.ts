@@ -1,12 +1,12 @@
 import "server-only";
 
-import { getActiveProducts, variantImage, variantLabel } from "@/lib/catalog";
+import { getPurchasableProducts, variantImage, variantLabel } from "@/lib/catalog";
 import type { CartCatalog } from "@/lib/cart";
 
-/** Builds the slim SKU map sent to the browser for cart rendering. */
+/** Builds the slim SKU map sent to the browser for cart rendering. Purchasable products only. */
 export function buildCartCatalog(): CartCatalog {
   const catalog: CartCatalog = {};
-  for (const product of getActiveProducts()) {
+  for (const product of getPurchasableProducts()) {
     for (const variant of product.variants) {
       const image = variantImage(product, variant);
       catalog[variant.sku] = {

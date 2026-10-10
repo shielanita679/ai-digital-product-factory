@@ -23,7 +23,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
         <label htmlFor="q" className="sr-only">Search products</label>
         <div className="relative flex-1">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted" size={18} />
-          <input id="q" name="q" type="search" defaultValue={query} autoFocus={!query} placeholder="Search products, materials, rooms…" maxLength={100} className="field pl-10" />
+          <input id="q" name="q" type="search" defaultValue={query} autoFocus={!query} placeholder="Search products or categories…" maxLength={100} className="field pl-10" />
         </div>
         <button type="submit" className="btn-primary">Search</button>
       </form>
@@ -31,7 +31,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
       <div className="mt-10">
         {query === "" ? (
           <div>
-            <p className="text-ink-2">Try a product type like &ldquo;mug&rdquo;, a material like &ldquo;linen&rdquo;, or browse a collection:</p>
+            <p className="text-ink-2">Try a product type like &ldquo;organizer&rdquo; or &ldquo;storage&rdquo;, or browse a collection:</p>
             <ul className="mt-4 flex flex-wrap gap-2">
               {getCollections().map((c) => (
                 <li key={c.slug}>

@@ -1,4 +1,13 @@
-export type ProductStatus = "active" | "draft" | "archived";
+/**
+ * Product lifecycle:
+ *  - draft        not shown on the storefront at all
+ *  - coming_soon  shown with its name, positioning and price, but cannot be ordered
+ *  - active       purchasable — only if every required fact has been supplied
+ *                 (see `activationIssues` in lib/catalog.ts); an incomplete
+ *                 "active" product is treated as coming soon until fixed
+ *  - archived     removed from the storefront, kept for records
+ */
+export type ProductStatus = "draft" | "coming_soon" | "active" | "archived";
 
 export type ProductImage = {
   src: string;
@@ -14,7 +23,7 @@ export type ProductOption = {
 };
 
 export type ProductVariant = {
-  /** Unique across the whole catalog. */
+  /** Full SKU, unique across the catalog, beginning with the product's skuPrefix. */
   sku: string;
   /** One value per product option, keyed by option name. */
   options: Record<string, string>;
@@ -25,7 +34,7 @@ export type ProductVariant = {
    * fabricated "was" prices are deceptive under FTC guidance.
    */
   compareAtPriceCents?: number;
-  /** Units on hand. 0 = out of stock. */
+  /** Verified units on hand. 0 = out of stock. */
   inventory: number;
   /** Index into product.images shown when this variant is selected. */
   imageIndex?: number;
@@ -40,38 +49,49 @@ export type Product = {
   name: string;
   collection: string;
   status: ProductStatus;
+  /** Internal SKU prefix; every variant SKU must start with it. */
+  skuPrefix: string;
   /**
-   * True for the demonstration catalog that ships with the codebase.
-   * `npm run check:launch` fails while any active product is still a sample.
+   * Selling price in cents. For pre-launch products this is the planned
+   * price shown on the storefront; purchasable prices come from variants.
    */
-  sample?: boolean;
-  /** One sentence for cards, search results and meta descriptions. */
+  priceCents: number;
+  /** One-sentence positioning, used on cards, search results and meta descriptions. */
   summary: string;
+
+  // ---- Verified product facts. Leave undefined until supplied. ----
   /** Product description, one paragraph per entry. */
-  description: string[];
-  features: string[];
-  specifications: { label: string; value: string }[];
-  included: string[];
+  description?: string[];
+  features?: string[];
+  specifications?: { label: string; value: string }[];
+  included?: string[];
   care?: string[];
-  /** Product-specific shipping or handling note, shown beside the general shipping summary. */
+  /** Product-specific shipping or handling note. */
   shippingNote?: string;
-  /** Set false for final-sale items. */
-  returnable: boolean;
+  /** False for final-sale items. Undefined = not yet decided. */
+  returnable?: boolean;
   options: ProductOption[];
+  /** Empty until real SKUs and verified inventory exist. */
   variants: ProductVariant[];
+  /** Real product photography only. */
   images: ProductImage[];
   /** Shipping weight per unit, packaged. */
-  weight: Weight;
+  weight?: Weight;
   /** Packaged dimensions. */
-  dimensions: Dimensions;
+  dimensions?: Dimensions;
+
   tags: string[];
-  /** Merchandising placement only — not a claim about sales volume. */
-  merchandising?: { featured?: boolean; essentials?: boolean };
+  /**
+   * Internal list of facts still to be supplied before this product can be
+   * activated. Never shown to customers; reported by `npm run check:launch`.
+   */
+  pendingData: string[];
 };
 
 export type Collection = {
   slug: string;
   name: string;
   description: string;
-  image: ProductImage;
+  /** Optional collection photography. Collections render without it. */
+  image?: ProductImage;
 };

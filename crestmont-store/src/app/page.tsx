@@ -1,31 +1,34 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 
+import { CollectionTile } from "@/components/collection-tile";
 import { NewsletterForm } from "@/components/forms/newsletter-form";
 import { ArrowRightIcon, LockIcon, MailIcon, ReturnIcon, TruckIcon } from "@/components/icons";
 import { ProductGrid } from "@/components/product/product-card";
 import { Setting } from "@/components/setting";
 import { business } from "@/config/business";
 import { commerce } from "@/config/commerce";
-import { getCollections, getEssentialProducts, getFeaturedProducts, getProductsInCollection } from "@/lib/catalog";
+import { getCollections, getProductsInCollection, getPurchasableProducts, getVisibleProducts } from "@/lib/catalog";
 import { pageMetadata } from "@/lib/seo";
+
+const homeTitle = `${business.brandName} | Home & Everyday Living`;
 
 export const metadata: Metadata = {
   ...pageMetadata({
-    title: `${business.brandName} | Home, Kitchen, Desk & Travel Goods`,
-    description: `Shop stoneware, linen, wood and canvas goods for the kitchen, home, desk and travel from ${business.brandName}. Clear product details, secure checkout and straightforward policies.`,
+    title: homeTitle,
+    description: `${business.brandName} is an online store for practical home and everyday living products: kitchen and dining, home organization, home comfort, and travel and everyday essentials.`,
     path: "/",
   }),
-  title: { absolute: `${business.brandName} | Home, Kitchen, Desk & Travel Goods` },
+  title: { absolute: homeTitle },
 };
 
-function SectionHeading({ eyebrow, title, href, linkLabel }: { eyebrow?: string; title: string; href?: string; linkLabel?: string }) {
+function SectionHeading({ eyebrow, title, intro, href, linkLabel }: { eyebrow?: string; title: string; intro?: string; href?: string; linkLabel?: string }) {
   return (
     <div className="mb-8 flex items-end justify-between gap-6 sm:mb-10">
       <div>
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h2 className="mt-2 text-3xl sm:text-4xl">{title}</h2>
+        {intro && <p className="mt-3 max-w-xl text-ink-2">{intro}</p>}
       </div>
       {href && (
         <Link href={href} className="hidden shrink-0 items-center gap-1.5 text-sm hover:underline hover:underline-offset-4 sm:inline-flex">
@@ -38,76 +41,67 @@ function SectionHeading({ eyebrow, title, href, linkLabel }: { eyebrow?: string;
 
 export default function HomePage() {
   const collections = getCollections();
-  const featured = getFeaturedProducts(8);
-  const essentials = getEssentialProducts(4);
+  const products = getVisibleProducts();
+  // "New arrivals" language is only used once something can actually be bought.
+  const hasAvailableProducts = getPurchasableProducts().length > 0;
   const returnWindow = commerce.returns.windowDays;
 
   return (
     <>
       {/* A. Hero */}
       <section className="border-b border-line">
-        <div className="page-x grid items-center gap-10 py-10 sm:py-14 lg:grid-cols-12 lg:gap-12 lg:py-20">
-          <div className="lg:col-span-5">
-            <p className="eyebrow">Kitchen · Home · Desk · Travel</p>
-            <h1 className="mt-4 text-[2.5rem] leading-[1.08] sm:text-5xl lg:text-[3.5rem]">Everyday goods, described plainly.</h1>
-            <p className="mt-5 max-w-md text-base leading-7 text-ink-2">
-              Stoneware, glass, wood, linen and canvas pieces for daily use. Every listing shows materials, dimensions, care and what&rsquo;s in the box, so you know exactly what you&rsquo;re ordering.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/shop" className="btn-primary">Shop now</Link>
-              <Link href="/collections" className="btn-secondary">Explore collections</Link>
-            </div>
-          </div>
+        <div className="page-x grid gap-12 py-14 sm:py-20 lg:grid-cols-12 lg:items-end lg:gap-16 lg:py-24">
           <div className="lg:col-span-7">
-            <div className="overflow-hidden bg-surface">
-              <Image
-                src="/images/lifestyle/hero.svg"
-                alt="Cutting board, glass pour-over set, stoneware mugs and a ceramic planter on a kitchen counter"
-                width={1600}
-                height={1200}
-                preload
-                sizes="(min-width: 1024px) 58vw, 100vw"
-                className="aspect-[4/3] h-auto w-full object-cover"
-              />
+            <p className="eyebrow">Home &amp; Everyday Living</p>
+            <h1 className="mt-4 text-[2.5rem] leading-[1.06] sm:text-6xl lg:text-[4.25rem]">Practical goods for everyday living.</h1>
+            <p className="mt-6 max-w-lg text-base leading-7 text-ink-2">
+              Home, organization and everyday essentials, selected for useful, straightforward function.
+            </p>
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <Link href="/shop" className="btn-primary">Explore the collection</Link>
+              {hasAvailableProducts ? (
+                <Link href="/shop" className="btn-secondary">Shop new arrivals</Link>
+              ) : (
+                <Link href="/collections" className="btn-secondary">Explore collections</Link>
+              )}
             </div>
           </div>
+          <nav aria-label="Collections" className="lg:col-span-5">
+            <ul className="border-t border-ink">
+              {collections.map((c, i) => (
+                <li key={c.slug} className="border-b border-line">
+                  <Link href={`/collections/${c.slug}`} className="group flex items-baseline gap-4 py-4 sm:py-5">
+                    <span className="w-6 shrink-0 font-serif text-sm text-muted tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="flex-1 font-serif text-xl sm:text-2xl">{c.name}</span>
+                    <ArrowRightIcon size={18} className="shrink-0 self-center text-muted transition-transform group-hover:translate-x-1 group-hover:text-ink" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
       </section>
 
       {/* B. Collections */}
       <section className="page-x py-16 sm:py-20">
-        <SectionHeading eyebrow="Collections" title="Shop by room and routine" href="/collections" linkLabel="All collections" />
+        <SectionHeading eyebrow="Collections" title="Shop by collection" href="/collections" linkLabel="All collections" />
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {collections.map((c) => (
-            <Link key={c.slug} href={`/collections/${c.slug}`} className="group block">
-              <div className="overflow-hidden bg-surface">
-                <Image
-                  src={c.image.src}
-                  alt={c.image.alt}
-                  width={c.image.width}
-                  height={c.image.height}
-                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
-                  loading="lazy"
-                  className="aspect-[4/3] h-auto w-full object-cover transition-transform duration-500 ease-out-soft group-hover:scale-[1.02]"
-                />
-              </div>
-              <div className="mt-3 flex items-baseline justify-between gap-3">
-                <h3 className="font-serif text-xl">{c.name}</h3>
-                <span className="text-[0.8125rem] text-muted">{getProductsInCollection(c.slug).length} products</span>
-              </div>
-              <p className="mt-1 text-sm text-ink-2">{c.description}</p>
-            </Link>
+          {collections.map((c, i) => (
+            <CollectionTile key={c.slug} collection={c} index={i} count={getProductsInCollection(c.slug).length} />
           ))}
         </div>
       </section>
 
-      {/* C. Featured products */}
+      {/* C. Products */}
       <section className="page-x pb-16 sm:pb-20">
-        <SectionHeading eyebrow="Featured" title="From the shop" href="/shop" linkLabel="View all products" />
-        <ProductGrid products={featured} />
-        <div className="mt-10 sm:hidden">
-          <Link href="/shop" className="btn-ghost w-full">View all products</Link>
-        </div>
+        <SectionHeading
+          eyebrow={hasAvailableProducts ? "The range" : "Coming soon"}
+          title={hasAvailableProducts ? "Shop the range" : "The initial range"}
+          intro={hasAvailableProducts ? undefined : "Our first products are being prepared for launch. Specifications and photography are published on each product page before it goes on sale."}
+          href="/shop"
+          linkLabel="View all products"
+        />
+        <ProductGrid products={products} />
       </section>
 
       {/* D. What to expect */}
@@ -117,14 +111,14 @@ export default function HomePage() {
             <p className="eyebrow">Shopping with us</p>
             <h2 className="mt-2 text-3xl sm:text-4xl">What you can expect when you order</h2>
             <p className="mt-4 text-ink-2">
-              {business.brandName} is an online store operated by {business.legalName}, based in Saint Louis, Missouri. Here is how we handle the parts of an order that matter most.
+              {business.brandName} is an online store operated by {business.legalName}, based in {business.address.city}, {business.address.regionName}. Here is how we handle the parts of an order that matter most.
             </p>
             <Link href="/about" className="link mt-6 inline-block text-sm">More about us</Link>
           </div>
           <dl className="grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:col-span-8">
             <div>
               <dt className="font-medium">Clear product information</dt>
-              <dd className="mt-1.5 text-sm leading-6 text-ink-2">Each listing includes materials, dimensions, care instructions and what&rsquo;s included, and notes when something like an insert or a plant isn&rsquo;t.</dd>
+              <dd className="mt-1.5 text-sm leading-6 text-ink-2">Product pages list materials, dimensions, care instructions and what&rsquo;s included. Products aren&rsquo;t offered for sale until those details are published.</dd>
             </div>
             <div>
               <dt className="font-medium">Secure checkout</dt>
@@ -148,12 +142,6 @@ export default function HomePage() {
             </div>
           </dl>
         </div>
-      </section>
-
-      {/* E. Everyday essentials */}
-      <section className="page-x py-16 sm:py-20">
-        <SectionHeading eyebrow="Everyday essentials" title="Small things that get used daily" href="/shop" linkLabel="Shop all" />
-        <ProductGrid products={essentials} />
       </section>
 
       {/* F. Shopping information */}
@@ -180,7 +168,7 @@ export default function HomePage() {
         <div className="page-x grid items-center gap-8 py-14 sm:py-16 lg:grid-cols-2">
           <div>
             <h2 className="text-3xl sm:text-4xl">Get product updates and new arrivals.</h2>
-            <p className="mt-3 text-paper/70">An occasional email when new products are added. No daily promotions.</p>
+            <p className="mt-3 text-paper/70">We&rsquo;ll email you when products are added to the store. Unsubscribe at any time.</p>
           </div>
           <div className="[&_.field]:border-paper/30 [&_.field]:bg-transparent [&_.field]:text-paper [&_.field]:placeholder:text-paper/50 [&_.field]:focus:border-paper [&_.btn-primary]:bg-paper [&_.btn-primary]:text-ink [&_.btn-primary]:hover:bg-surface [&_.link]:text-paper [&_p]:text-paper/60">
             <NewsletterForm />

@@ -1,11 +1,12 @@
-# CRESTMONT HOLDINGS — online store
+# CRESTMONT HOLDINGS — Home & Everyday Living store
 
 Storefront for **CRESTMONT HOLDINGS LLC** (Missouri), built with Next.js 16
 (App Router), TypeScript, Tailwind CSS 4 and Stripe Checkout.
 
 > Before taking real orders, work through [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md).
-> The shipped catalog and images are **samples**, and unconfirmed business terms
-> appear on the site as highlighted "to be confirmed" placeholders.
+> The catalog contains the 12 planned launch products in **coming soon** status
+> (no photography, specifications or inventory yet), and unconfirmed business
+> terms appear on the site as highlighted "to be confirmed" placeholders.
 
 ## Getting started
 
@@ -21,7 +22,6 @@ npm run dev                  # http://localhost:3000
 | `npm run dev` / `build` / `start` | Develop, build, serve |
 | `npm run lint` / `typecheck` / `test` | ESLint, TypeScript, Vitest |
 | `npm run check:launch` | Lists every term, credential or catalog item still needing attention |
-| `node scripts/generate-placeholder-images.mjs` | Regenerates the placeholder artwork |
 
 ## Where things live
 
@@ -36,11 +36,20 @@ npm run dev                  # http://localhost:3000
 | Checkout / webhook / forms APIs | `src/app/api/**/route.ts` |
 
 ### Products
+Status lifecycle: `draft` (hidden) → `coming_soon` (shown, not orderable) →
+`active` (orderable) → `archived` (hidden). A product is only purchasable when
+it is `active` **and** `activationIssues()` in `src/lib/catalog.ts` finds
+nothing missing: full SKUs starting with its `skuPrefix`, verified inventory,
+photography, description, specifications, what's included, shipping weight,
+package dimensions, return eligibility and an empty `pendingData` list. An
+incomplete "active" product is shown as coming soon, and the cart, checkout
+API and tests all refuse it.
+
 Each product supports SKU (per variant, unique), name, slug, description,
 features, specifications, what's included, care, price, compare-at price,
 images, collection, inventory, variants/options, shipping weight, package
 dimensions, a product-specific shipping note, returnability and status
-(`active` / `draft` / `archived`). Tests enforce SKU/slug uniqueness and
+(see lifecycle above). Tests enforce SKU/slug uniqueness and
 valid references.
 
 ## Payments

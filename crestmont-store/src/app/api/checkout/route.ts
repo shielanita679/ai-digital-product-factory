@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       product_data: {
         name: l.name,
         description: l.variant || undefined,
-        images: canUseImages && !l.image.endsWith(".svg") ? [absoluteUrl(l.image)] : undefined,
+        images: canUseImages && l.image ? [absoluteUrl(l.image)] : undefined,
         metadata: { sku: l.sku },
       },
     },

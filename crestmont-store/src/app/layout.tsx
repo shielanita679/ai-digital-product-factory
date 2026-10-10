@@ -15,11 +15,11 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const newsreader = Newsreader({ subsets: ["latin"], variable: "--font-newsreader", display: "swap", weight: ["400", "500"], style: ["normal", "italic"] });
 
-const defaultDescription = `Shop kitchen, home, desk and travel goods from ${business.brandName}. Clear product details, secure checkout and straightforward policies.`;
+const defaultDescription = `${business.brandName} is an online store for practical home and everyday living products, with clear product details, secure checkout and straightforward policies.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(business.siteUrl),
-  title: { default: `${business.brandName} | Home, Kitchen, Desk & Travel Goods`, template: `%s | ${business.brandName}` },
+  title: { default: `${business.brandName} | Home & Everyday Living`, template: `%s | ${business.brandName}` },
   description: defaultDescription,
   applicationName: business.brandName,
   openGraph: { type: "website", siteName: business.brandName, title: business.brandName, description: defaultDescription, url: business.siteUrl, locale: "en_US" },

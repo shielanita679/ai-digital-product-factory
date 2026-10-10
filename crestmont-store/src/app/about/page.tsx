@@ -1,63 +1,92 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/page-header";
 import { addressLines, business } from "@/config/business";
+import { getCollections } from "@/lib/catalog";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
   title: "About Us",
-  description: `${business.brandName} is an online store operated by ${business.legalName}, a Missouri limited liability company based in Saint Louis.`,
+  description: `${business.brandName} is an online store for home and everyday living products, operated by ${business.legalName}, a ${business.address.regionName} limited liability company based in ${business.address.city}.`,
   path: "/about",
 });
 
 export default function AboutPage() {
+  const collections = getCollections();
   return (
     <>
       <PageHeader title="About us" crumbs={[{ label: "About", href: "/about" }]} />
       <div className="page-x grid gap-12 py-12 sm:py-16 lg:grid-cols-12">
         <div className="prose-store lg:col-span-7">
           <p className="!mt-0 font-serif text-2xl leading-snug text-ink">
-            {business.brandName} is an online store selling household goods for the kitchen, home, desk and travel. The store is operated by {business.legalName}, a {business.address.regionName} limited liability company.
+            {business.legalName} operates {business.brandName}, an e-commerce storefront focused on practical products for the home and everyday routines.
           </p>
 
           <h2>What we sell</h2>
-          <p>
-            Our range is deliberately small: practical, everyday items in materials like stoneware, glass, wood, linen and canvas. We would rather offer a short list of products we can describe accurately than a long one we can&rsquo;t.
-          </p>
-
-          <h2>How we write product pages</h2>
-          <p>
-            Every listing includes materials, dimensions, care instructions and exactly what comes in the package. If something isn&rsquo;t included — a pillow insert, a plant — we say so. Prices shown on the site are the prices you pay for the items; shipping and any applicable tax are shown at checkout before you confirm payment.
-          </p>
-
-          <h2>Ordering and fulfillment</h2>
-          <p>
-            Orders are placed through our website and paid for on our payment processor&rsquo;s secure, hosted checkout. Once payment is confirmed, we prepare your order and send it to the shipping address you provided. Delivery estimates, carriers and costs are explained in our <Link href="/shipping-policy">Shipping Policy</Link>.
-          </p>
-
-          <h2>Customer support</h2>
-          <p>
-            If you have a question before or after you order — about a product, a delivery or a return — <Link href="/contact">contact us</Link> and include your order number if you have one. Returns are handled under our <Link href="/return-policy">Return &amp; Refund Policy</Link>.
-          </p>
-
-          <h2>Company details</h2>
-          <address className="not-italic">
-            <strong>{business.legalName}</strong>
-            {addressLines().map((l) => (
-              <span key={l} className="block">{l}</span>
+          <p>Our range is organized into {collections.length} collections:</p>
+          <ul>
+            {collections.map((c) => (
+              <li key={c.slug}>
+                <Link href={`/collections/${c.slug}`}>{c.name}</Link> — {c.description.charAt(0).toLowerCase() + c.description.slice(1)}
+              </li>
             ))}
-          </address>
+          </ul>
+          <p>We keep the range focused, and we add products to the store as their details are confirmed.</p>
+
+          <h2>Straightforward product information</h2>
           <p>
-            Formed in the State of {business.stateOfFormation}, {business.countryOfFormation}.
+            We aim to describe every product plainly: what it is, its materials and dimensions, how to care for it and what comes in the package. A product isn&rsquo;t offered for sale until those details and its photography are published on its page.
+          </p>
+
+          <h2>Clear purchasing terms</h2>
+          <p>
+            Prices are shown in U.S. dollars. Shipping costs and any applicable tax appear at checkout before you pay, and payment is handled on our payment processor&rsquo;s secure, hosted checkout page. How we ship, accept returns and issue refunds is set out in our <Link href="/shipping-policy">Shipping Policy</Link>, <Link href="/return-policy">Return &amp; Refund Policy</Link> and <Link href="/payment-policy">Payment Policy</Link>.
+          </p>
+
+          <h2>Accessible customer support</h2>
+          <p>
+            If you have a question about a product, an order or a delivery, <Link href="/contact">contact us</Link>. Include your order number if you have one so we can find it quickly.
           </p>
         </div>
-        <div className="lg:col-span-5">
-          <div className="overflow-hidden bg-surface lg:sticky lg:top-28">
-            <Image src="/images/lifestyle/workspace.svg" alt="Felt desk pad, notebook, mug and planter arranged on a desk" width={1600} height={1000} sizes="(min-width: 1024px) 40vw, 100vw" className="aspect-[4/5] h-auto w-full object-cover" />
+
+        <aside className="lg:col-span-4 lg:col-start-9">
+          <div className="border border-line bg-surface p-6 text-sm leading-6 lg:sticky lg:top-28">
+            <h2 className="eyebrow">Company details</h2>
+            <dl className="mt-4 space-y-4">
+              <div>
+                <dt className="text-muted">Legal name</dt>
+                <dd className="font-medium text-ink">{business.legalName}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Entity</dt>
+                <dd className="text-ink-2">
+                  {business.entityType}, formed in {business.stateOfFormation}, {business.countryOfFormation}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Business address</dt>
+                <dd className="text-ink-2">
+                  <address className="not-italic">
+                    {addressLines().map((l) => (
+                      <span key={l} className="block">{l}</span>
+                    ))}
+                  </address>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Contact</dt>
+                <dd className="text-ink-2">
+                  {business.supportEmail ? (
+                    <a href={`mailto:${business.supportEmail}`} className="link">{business.supportEmail}</a>
+                  ) : (
+                    <Link href="/contact" className="link">Contact form</Link>
+                  )}
+                </dd>
+              </div>
+            </dl>
           </div>
-        </div>
+        </aside>
       </div>
     </>
   );

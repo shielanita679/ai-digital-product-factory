@@ -2,18 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import type { Product } from "@/catalog/types";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ImagePending } from "@/components/product/image-pending";
+import { Price } from "@/components/product/price";
 import { ProductGrid } from "@/components/product/product-card";
 import { ProductExperience } from "@/components/product/product-experience";
 import { Setting } from "@/components/setting";
 import { absoluteUrl, business } from "@/config/business";
 import { commerce } from "@/config/commerce";
-import { defaultVariant, getActiveProducts, getCollectionBySlug, getProductBySlug, getRelatedProducts, variantLabel } from "@/lib/catalog";
+import { defaultVariant, getCollectionBySlug, getProductBySlug, getRelatedProducts, getVisibleProducts, isPurchasable, variantLabel } from "@/lib/catalog";
 import { jsonLdString } from "@/lib/json-ld";
 import { pageMetadata } from "@/lib/seo";
 
 export function generateStaticParams() {
-  return getActiveProducts().map((p) => ({ slug: p.slug }));
+  return getVisibleProducts().map((p) => ({ slug: p.slug }));
 }
 
 export const dynamicParams = false;
@@ -22,12 +25,11 @@ export async function generateMetadata({ params }: PageProps<"/products/[slug]">
   const { slug } = await params;
   const product = getProductBySlug(slug);
   if (!product) return {};
-  const image = product.images[0].src;
   return pageMetadata({
     title: product.name,
-    description: product.summary,
+    description: isPurchasable(product) ? product.summary : `${product.summary} Coming soon to ${business.brandName}.`,
     path: `/products/${slug}`,
-    image: image.endsWith(".svg") ? undefined : image,
+    image: product.images[0]?.src,
   });
 }
 
@@ -43,14 +45,79 @@ function Detail({ title, open = false, children }: { title: string; open?: boole
   );
 }
 
+function crumbsFor(product: Product) {
+  const collection = getCollectionBySlug(product.collection);
+  return [
+    ...(collection ? [{ label: collection.name, href: `/collections/${collection.slug}` }] : [{ label: "Shop", href: "/shop" }]),
+    { label: product.name, href: `/products/${product.slug}` },
+  ];
+}
+
 export default async function ProductPage({ params }: PageProps<"/products/[slug]">) {
   const { slug } = await params;
   const product = getProductBySlug(slug);
   if (!product) notFound();
 
-  const collection = getCollectionBySlug(product.collection);
   const related = getRelatedProducts(product, 4);
+
+  return (
+    <div className="page-x py-8 sm:py-10">
+      {isPurchasable(product) ? <PurchasableProduct product={product} /> : <ComingSoonProduct product={product} />}
+
+      {related.length > 0 && (
+        <section className="mt-20 border-t border-line pt-14 sm:mt-24">
+          <h2 className="mb-8 text-3xl">You may also like</h2>
+          <ProductGrid products={related} />
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** Pre-launch product: name, positioning and planned price only. Cannot be ordered. */
+function ComingSoonProduct({ product }: { product: Product }) {
+  const collection = getCollectionBySlug(product.collection);
+  return (
+    <div className="grid gap-10 lg:grid-cols-12 lg:gap-14">
+      <div className="lg:col-span-7">
+        <ImagePending name={product.name} collection={collection?.name} size="large" />
+      </div>
+      <div className="lg:col-span-5">
+        <div className="lg:sticky lg:top-28">
+          <Breadcrumbs items={crumbsFor(product)} />
+          <p className="eyebrow mt-6">Coming soon</p>
+          <h1 className="mt-2 text-3xl sm:text-4xl">{product.name}</h1>
+          <p className="mt-3 text-ink-2">{product.summary}</p>
+          <p className="mt-4 text-xl">
+            <Price cents={product.priceCents} />
+          </p>
+
+          <div className="mt-8 border border-line bg-surface p-5 text-sm leading-6 text-ink-2" role="status">
+            <p className="font-medium text-ink">Not yet available to order</p>
+            <p className="mt-1">
+              This product is being prepared for launch. Full specifications, dimensions, materials, what&rsquo;s included and product photography will be published here before it goes on sale.
+            </p>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+            {collection && (
+              <Link href={`/collections/${collection.slug}`} className="btn-secondary">
+                More in {collection.name}
+              </Link>
+            )}
+            <Link href="/contact" className="btn-ghost">
+              Ask a question
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PurchasableProduct({ product }: { product: Product }) {
   const url = absoluteUrl(`/products/${product.slug}`);
+  const returnWindow = commerce.returns.windowDays;
 
   // Product structured data built from real catalog values only — no ratings or reviews.
   const productJsonLd = {
@@ -75,62 +142,64 @@ export default async function ProductPage({ params }: PageProps<"/products/[slug
     })),
   };
 
-  const returnWindow = commerce.returns.windowDays;
-
   return (
-    <div className="page-x py-8 sm:py-10">
+    <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(productJsonLd) }} />
-
       <ProductExperience
         product={product}
         initialSku={defaultVariant(product).sku}
         header={
           <>
-            <Breadcrumbs
-              items={[
-                ...(collection ? [{ label: collection.name, href: `/collections/${collection.slug}` }] : [{ label: "Shop", href: "/shop" }]),
-                { label: product.name, href: `/products/${product.slug}` },
-              ]}
-            />
+            <Breadcrumbs items={crumbsFor(product)} />
             <h1 className="mt-5 text-3xl sm:text-4xl">{product.name}</h1>
             <p className="mt-3 text-ink-2">{product.summary}</p>
           </>
         }
       >
         <div className="mt-10 border-t border-line">
-          <Detail title="Description" open>
-            {product.description.map((p) => (
-              <p key={p.slice(0, 32)} className="mb-3 last:mb-0">{p}</p>
-            ))}
-          </Detail>
-          <Detail title="Features">
-            <ul className="list-disc space-y-1 pl-5 marker:text-line-strong">
-              {product.features.map((f) => <li key={f}>{f}</li>)}
-            </ul>
-          </Detail>
+          {product.description && (
+            <Detail title="Description" open>
+              {product.description.map((p) => (
+                <p key={p.slice(0, 32)} className="mb-3 last:mb-0">{p}</p>
+              ))}
+            </Detail>
+          )}
+          {product.features && product.features.length > 0 && (
+            <Detail title="Features">
+              <ul className="list-disc space-y-1 pl-5 marker:text-line-strong">
+                {product.features.map((f) => <li key={f}>{f}</li>)}
+              </ul>
+            </Detail>
+          )}
           <Detail title="Specifications">
             <dl className="divide-y divide-line">
-              {product.specifications.map((s) => (
+              {product.specifications?.map((s) => (
                 <div key={s.label} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 py-2">
                   <dt className="text-muted">{s.label}</dt>
                   <dd>{s.value}</dd>
                 </div>
               ))}
-              <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 py-2">
-                <dt className="text-muted">Shipping weight</dt>
-                <dd>{product.weight.value} {product.weight.unit}</dd>
-              </div>
-              <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 py-2">
-                <dt className="text-muted">Package size</dt>
-                <dd>{product.dimensions.length} × {product.dimensions.width} × {product.dimensions.height} {product.dimensions.unit}</dd>
-              </div>
+              {product.weight && (
+                <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 py-2">
+                  <dt className="text-muted">Shipping weight</dt>
+                  <dd>{product.weight.value} {product.weight.unit}</dd>
+                </div>
+              )}
+              {product.dimensions && (
+                <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 py-2">
+                  <dt className="text-muted">Package size</dt>
+                  <dd>{product.dimensions.length} × {product.dimensions.width} × {product.dimensions.height} {product.dimensions.unit}</dd>
+                </div>
+              )}
             </dl>
           </Detail>
-          <Detail title="What's included">
-            <ul className="list-disc space-y-1 pl-5 marker:text-line-strong">
-              {product.included.map((f) => <li key={f}>{f}</li>)}
-            </ul>
-          </Detail>
+          {product.included && (
+            <Detail title="What's included">
+              <ul className="list-disc space-y-1 pl-5 marker:text-line-strong">
+                {product.included.map((f) => <li key={f}>{f}</li>)}
+              </ul>
+            </Detail>
+          )}
           {product.care && product.care.length > 0 && (
             <Detail title="Care">
               <ul className="list-disc space-y-1 pl-5 marker:text-line-strong">
@@ -157,13 +226,6 @@ export default async function ProductPage({ params }: PageProps<"/products/[slug
           </Detail>
         </div>
       </ProductExperience>
-
-      {related.length > 0 && (
-        <section className="mt-20 border-t border-line pt-14 sm:mt-24">
-          <h2 className="mb-8 text-3xl">You may also like</h2>
-          <ProductGrid products={related} />
-        </section>
-      )}
-    </div>
+    </>
   );
 }
