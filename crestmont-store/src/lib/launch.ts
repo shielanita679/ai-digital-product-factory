@@ -1,12 +1,14 @@
 import { business } from "@/config/business";
 import { commerce } from "@/config/commerce";
+import { operations } from "@/config/operations";
+import { policies } from "@/config/policies";
 import { products } from "@/catalog/products";
 import { activationIssues, getPurchasableProducts } from "@/lib/catalog";
 
 /**
- * Lists every business term or setting that must be confirmed before the
- * store takes real orders. Used by `npm run check:launch` and to gate
- * checkout.
+ * Lists every business term, credential, catalog item or infrastructure
+ * decision that must be resolved before the store takes real orders. Used by
+ * `npm run check:launch` and to gate checkout.
  */
 export function getLaunchIssues(): string[] {
   const issues: string[] = [];
@@ -14,28 +16,41 @@ export function getLaunchIssues(): string[] {
     if (value === null || value === undefined || value === "") issues.push(message);
   };
 
-  need(process.env.NEXT_PUBLIC_SITE_URL, "NEXT_PUBLIC_SITE_URL is not set (domain, canonical URLs, support email).");
-  need(business.supportResponseTime, "Support response time is not set (config/business.ts).");
-  need(business.supportHours, "Support hours are not set (config/business.ts).");
+  // Domain & support
+  need(process.env.NEXT_PUBLIC_SITE_URL, "Production domain: NEXT_PUBLIC_SITE_URL is not set.");
+  if (!process.env.RESEND_API_KEY || !process.env.CONTACT_FROM_EMAIL) {
+    issues.push("Contact-form delivery: RESEND_API_KEY and CONTACT_FROM_EMAIL are not both set (forms show as unavailable).");
+  }
 
+  // Payments / checkout
   issues.push(...getCheckoutBlockers());
-  need(commerce.carriers, "Shipping carriers are not set (config/commerce.ts).");
-  need(commerce.shipsToPOBoxes, "P.O. box shipping decision is not set (config/commerce.ts).");
-  need(commerce.orderChangeWindow, "Order change/cancellation window is not set (config/commerce.ts).");
-  need(commerce.deliveryIssueReportWindow, "Window for reporting delivery issues is not set (config/commerce.ts).");
-  need(commerce.returns.returnShippingPaidBy, "Return shipping responsibility is not set (config/commerce.ts).");
-  need(commerce.returns.restockingFeePercent, "Restocking fee decision is not set (config/commerce.ts).");
-  need(commerce.returns.refundProcessingDays, "Refund processing time is not set (config/commerce.ts).");
+  if (commerce.paymentsEnabled && !process.env.STRIPE_WEBHOOK_SECRET) {
+    issues.push("STRIPE_WEBHOOK_SECRET is not set; paid orders will not be recorded by the webhook.");
+  }
+  if (process.env.STRIPE_AUTOMATIC_TAX !== "true") {
+    issues.push("Sales tax setup not finalized (Stripe Tax is off; STRIPE_AUTOMATIC_TAX is not \"true\").");
+  }
+
+  // Fulfillment
+  need(commerce.fulfillmentMethod, "Fulfillment method is not confirmed (config/commerce.ts).");
+  need(commerce.carriers, "Shipping carriers are not confirmed (config/commerce.ts) — site refers to \"the shipping service\" until set.");
   if (commerce.international.enabled) {
     need(commerce.international.deliveryEstimate, "International delivery estimate is not set (config/commerce.ts).");
   }
 
-  if (!process.env.STRIPE_WEBHOOK_SECRET) issues.push("STRIPE_WEBHOOK_SECRET is not set; paid orders will not be recorded by the webhook.");
-  if (!process.env.RESEND_API_KEY && !process.env.CONTACT_WEBHOOK_URL) {
-    issues.push("No contact-form delivery is configured (RESEND_API_KEY or CONTACT_WEBHOOK_URL).");
+  // Policies
+  need(policies.effectiveDate, "Policy effective date is not set (config/policies.ts) — set it to the launch date.");
+
+  // Infrastructure
+  need(operations.hostingProvider, "Hosting provider is not selected (config/operations.ts).");
+  if (!operations.orderDatabaseConfigured) {
+    issues.push("Order & inventory database is not built (planned: a separate Crestmont Supabase project — see docs/ARCHITECTURE.md).");
+  }
+  if (operations.rateLimiter === "in_memory") {
+    issues.push("Rate limiter is in-memory only and gives no distributed protection; replace before production (lib/rate-limit.ts).");
   }
 
-  // Catalog: every storefront product must be fully specified before launch.
+  // Catalog
   for (const p of products) {
     if (p.status === "draft" || p.status === "archived") continue;
     const missing = activationIssues(p);
@@ -59,12 +74,15 @@ export function getLaunchIssues(): string[] {
 /** Conditions that prevent creating a payment session at all. */
 export function getCheckoutBlockers(): string[] {
   const issues: string[] = [];
-  if (!process.env.STRIPE_SECRET_KEY) issues.push("STRIPE_SECRET_KEY is not set.");
+  if (!commerce.paymentsEnabled) issues.push("Payments are disabled (commerce.paymentsEnabled = false in config/commerce.ts).");
+  if (!process.env.STRIPE_SECRET_KEY || !commerce.paymentsEnabled) {
+    issues.push("Crestmont's own Stripe account is not connected (STRIPE_SECRET_KEY for this store).");
+  }
   if (commerce.shippingRates.length === 0) issues.push("No shipping rates are configured (config/commerce.ts).");
   if (!commerce.processingTime) issues.push("Order processing time is not set (config/commerce.ts).");
   if (!commerce.domesticDeliveryEstimate) issues.push("Domestic delivery estimate is not set (config/commerce.ts).");
   if (commerce.returns.windowDays === null) issues.push("Return window is not set (config/commerce.ts).");
-  if (!business.supportEmail) issues.push("Support email is not set.");
+  if (!business.supportEmail) issues.push("Support email: SUPPORT_EMAIL is not set.");
   if (getPurchasableProducts().length === 0) issues.push("No products are available for purchase yet (all are draft or coming soon).");
   return issues;
 }

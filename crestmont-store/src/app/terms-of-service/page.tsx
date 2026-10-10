@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { PolicyContact, PolicyLayout } from "@/components/policy-layout";
 import { business } from "@/config/business";
+import { policies } from "@/config/policies";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -30,7 +31,7 @@ export default function TermsPage() {
 
       <h2>2. Eligibility</h2>
       <p>
-        You must be at least 18 years old, or the age of majority where you live, to place an order. By placing an order you confirm that you meet this requirement and that the information you provide is accurate.
+        You must be at least {policies.minimumBuyerAge} years old, or the age of majority where you live if that is higher, to place an order. By placing an order you confirm that you meet this requirement and that the information you provide is accurate.
       </p>
 
       <h2>3. Products</h2>
@@ -60,7 +61,7 @@ export default function TermsPage() {
 
       <h2>8. Shipping and risk of loss</h2>
       <p>
-        Shipping is handled as described in our <Link href="/shipping-policy">Shipping Policy</Link>. Delivery dates are estimates only. Title and risk of loss pass to you when the products are delivered to the carrier; however, we will still help with packages that are lost or damaged in transit as our Shipping Policy describes.
+        Shipping is handled as described in our <Link href="/shipping-policy">Shipping Policy</Link>. Delivery times are estimates, not guarantees. Lost, delayed and damaged deliveries are handled as our Shipping Policy and Return &amp; Refund Policy describe.
       </p>
 
       <h2>9. Returns and refunds</h2>
@@ -110,7 +111,7 @@ export default function TermsPage() {
 
       <h2>17. Governing law</h2>
       <p>
-        These Terms are governed by the laws of the State of {business.stateOfFormation} and applicable U.S. federal law, without regard to conflict-of-law rules. Nothing in this section removes protections you have under the consumer laws of the place where you live.
+        These Terms are governed by the laws of the State of {policies.governingLaw.state}, {policies.governingLaw.country}, and applicable U.S. federal law, without regard to conflict-of-law rules. Nothing in this section removes protections you have under the consumer laws of the place where you live.
       </p>
 
       <h2>18. Severability</h2>

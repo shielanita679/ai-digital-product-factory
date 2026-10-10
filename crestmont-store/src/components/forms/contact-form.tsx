@@ -4,9 +4,9 @@ import Link from "next/link";
 
 import { contactSubjects } from "@/config/contact";
 
-import { Honeypot, useSubmit } from "./use-submit";
+import { Honeypot, UnavailableNotice, useSubmit } from "./use-submit";
 
-export function ContactForm({ defaultSubject, defaultOrderNumber }: { defaultSubject?: string; defaultOrderNumber?: string }) {
+export function ContactForm({ available, defaultSubject, defaultOrderNumber }: { available: boolean; defaultSubject?: string; defaultOrderNumber?: string }) {
   const { state, submit } = useSubmit("/api/contact");
 
   if (state.status === "success") {
@@ -21,6 +21,7 @@ export function ContactForm({ defaultSubject, defaultOrderNumber }: { defaultSub
   return (
     <form
       className="relative grid gap-5"
+      aria-describedby={available ? undefined : "contact-unavailable"}
       onSubmit={async (e) => {
         e.preventDefault();
         const form = e.currentTarget;
@@ -28,6 +29,8 @@ export function ContactForm({ defaultSubject, defaultOrderNumber }: { defaultSub
       }}
     >
       <Honeypot />
+      {!available && <UnavailableNotice id="contact-unavailable" />}
+      <fieldset disabled={!available} className="contents">
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <label htmlFor="c-name" className="field-label">Name</label>
@@ -68,6 +71,7 @@ export function ContactForm({ defaultSubject, defaultOrderNumber }: { defaultSub
           {state.status === "submitting" ? "Sending…" : "Send message"}
         </button>
       </div>
+      </fieldset>
     </form>
   );
 }

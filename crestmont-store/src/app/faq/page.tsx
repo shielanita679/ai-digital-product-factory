@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Setting } from "@/components/setting";
 import { business } from "@/config/business";
 import { commerce } from "@/config/commerce";
+import { deliveryDisclaimer, requiredInfoPhrase, resolutionsPhrase } from "@/lib/policy-text";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -29,7 +30,7 @@ export default function FaqPage() {
           q: "Can I change or cancel my order?",
           a: (
             <>
-              Contact us as soon as possible with your order number. We can usually make changes or cancel <Setting value={commerce.orderChangeWindow} label="order change window" />. Once an order has shipped it can&rsquo;t be changed, but it may be eligible for a return. See <Link href="/shipping-policy#order-changes">order changes</Link>.
+              You may request a cancellation or shipping-address change {commerce.orderChangeCutoff}. Contact us as soon as possible with your order number. Once an order has been processed for shipment, changes or cancellation may no longer be possible, so we can&rsquo;t guarantee every request. See <Link href="/shipping-policy#order-changes">cancellations and address changes</Link>.
             </>
           ),
         },
@@ -60,7 +61,7 @@ export default function FaqPage() {
         },
         {
           q: "Do you charge sales tax?",
-          a: <>Where we are required to collect sales tax, it is calculated at checkout based on your shipping address and shown before you pay.</>,
+          a: <>If sales tax applies to your order, it is shown at checkout before you pay.</>,
         },
       ],
     },
@@ -71,7 +72,7 @@ export default function FaqPage() {
           q: "How long does it take to ship?",
           a: (
             <>
-              Orders are prepared within <Setting value={commerce.processingTime} label="processing time" />. Domestic delivery typically takes <Setting value={commerce.domesticDeliveryEstimate} label="delivery estimate" /> after dispatch. Estimates aren&rsquo;t guaranteed delivery dates.
+              Orders are processed within <Setting value={commerce.processingTime} label="processing time" />. Estimated US delivery is then <Setting value={commerce.domesticDeliveryEstimate} label="delivery estimate" /> after dispatch. {deliveryDisclaimer}
             </>
           ),
         },
@@ -85,13 +86,13 @@ export default function FaqPage() {
         },
         {
           q: "How much is shipping?",
-          a: <>Shipping options and costs for your order are shown at checkout before you pay. See our <Link href="/shipping-policy">Shipping Policy</Link> for details.</>,
+          a: <>Shipping costs are calculated and displayed at checkout, based on the shipping method, before you pay. See our <Link href="/shipping-policy">Shipping Policy</Link> for details.</>,
         },
         {
-          q: "My package is late, lost or damaged. What should I do?",
+          q: "My order arrived damaged or incorrect. What should I do?",
           a: (
             <>
-              <Link href="/contact">Contact us</Link> with your order number <Setting value={commerce.deliveryIssueReportWindow} label="reporting window" />. For damage, please include photos of the item and packaging.
+              <Link href="/contact">Contact us</Link> {commerce.damagedOrIncorrect.reportWindow} with {requiredInfoPhrase()}. Depending on the circumstances and product availability, support may offer {resolutionsPhrase()}. For late or missing packages, see <Link href="/shipping-policy#delivery-issues">delivery issues</Link>.
             </>
           ),
         },
@@ -104,7 +105,7 @@ export default function FaqPage() {
           q: "What is your return policy?",
           a: (
             <>
-              Eligible items can be returned within <Setting value={r.windowDays} label="return window" />{r.windowDays !== null && " days"} of delivery if they are unused and in their original packaging. Read the full <Link href="/return-policy">Return &amp; Refund Policy</Link>.
+              Eligible items can be returned within <Setting value={r.windowDays} label="return window" />{r.windowDays !== null && " days"} after delivery if they are unused and in the condition received. Final-sale items are marked on the product page and can&rsquo;t be returned. Read the full <Link href="/return-policy">Return &amp; Refund Policy</Link>.
             </>
           ),
         },
@@ -113,10 +114,18 @@ export default function FaqPage() {
           a: <>Contact customer support with your order number and the items you&rsquo;d like to return. We&rsquo;ll confirm eligibility and send return instructions. Please don&rsquo;t send items back without instructions.</>,
         },
         {
+          q: "Can I exchange an item?",
+          a: <>We don&rsquo;t offer direct exchanges at this time. Return an eligible item under our Return &amp; Refund Policy and place a new order for the product or variant you&rsquo;d like.</>,
+        },
+        {
+          q: "Do I pay for return shipping?",
+          a: <>For change-of-mind returns, return shipping is your responsibility unless we state otherwise, and there is no restocking fee. If we need an incorrect item, or one with damage we verify occurred before delivery, sent back, we cover the reasonable return shipping cost.</>,
+        },
+        {
           q: "When will I get my refund?",
           a: (
             <>
-              Approved refunds are issued to your original payment method within <Setting value={r.refundProcessingDays} label="refund processing time" /> of the return being received and inspected. Your bank or card issuer may take additional time to post it.
+              After we receive and inspect an approved return, we aim to issue the refund within <Setting value={r.refundProcessingDays} label="refund processing time" />, normally to the original payment method. Your bank or payment provider may then need additional time to post the credit.
             </>
           ),
         },

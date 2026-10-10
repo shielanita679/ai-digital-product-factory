@@ -27,7 +27,6 @@ export default function PrivacyPolicyPage() {
       <ul>
         <li><strong>Order information:</strong> your name, email address, shipping and billing address, phone number (if provided) and the items you purchase.</li>
         <li><strong>Messages:</strong> the details you submit through our contact or order-status forms, such as your name, email, order number and message.</li>
-        <li><strong>Newsletter:</strong> your email address, if you sign up for product updates.</li>
       </ul>
       <h3>Payment information</h3>
       <p>
@@ -46,7 +45,6 @@ export default function PrivacyPolicyPage() {
         <li>To process returns, refunds and cancellations</li>
         <li>To detect, investigate and prevent fraud, unauthorized transactions and abuse of the website</li>
         <li>To operate, maintain, secure and improve the website</li>
-        <li>To send product updates and new-arrival emails if you have asked to receive them</li>
         <li>To comply with legal, tax and accounting obligations and to enforce our <Link href="/terms-of-service">Terms of Service</Link></li>
       </ul>
 
@@ -71,12 +69,12 @@ export default function PrivacyPolicyPage() {
 
       <h2>Marketing communications</h2>
       <p>
-        We send product update emails only if you sign up for them. Every email includes an unsubscribe link, and you can also ask us to unsubscribe you at any time. Order confirmations and other transactional messages about your purchases are not marketing and will still be sent.
+        We do not currently send marketing emails. If we introduce them in the future, we will send them only to people who have signed up, every message will include a way to unsubscribe, and we will update this policy first. Order confirmations and other transactional messages about your purchases are not marketing.
       </p>
 
       <h2>Data retention</h2>
       <p>
-        We keep order and transaction records for as long as needed to fulfil orders, handle returns and warranty questions, and meet tax, accounting and legal requirements. Support messages are kept for as long as needed to resolve your request and maintain a record of it. Newsletter data is kept until you unsubscribe. When information is no longer needed, we delete or anonymize it.
+        We keep order and transaction records for as long as needed to fulfil orders, handle returns and meet tax, accounting and legal requirements. Support messages are kept for as long as needed to resolve your request and maintain a record of it. When information is no longer needed, we delete or anonymize it.
       </p>
 
       <h2>Your rights and choices</h2>
@@ -86,7 +84,7 @@ export default function PrivacyPolicyPage() {
         <li>Request that we correct inaccurate information</li>
         <li>Request that we delete your information, subject to legal exceptions (for example, records we must keep for tax purposes)</li>
         <li>Request a copy of your information in a portable format</li>
-        <li>Opt out of marketing emails</li>
+        <li>Opt out of any marketing emails we may send in the future</li>
         <li>Not be discriminated against for exercising these rights</li>
       </ul>
       <p>

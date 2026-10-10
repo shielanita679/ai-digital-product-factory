@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import type { Product } from "@/catalog/types";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ImagePending } from "@/components/product/image-pending";
-import { Price } from "@/components/product/price";
 import { ProductGrid } from "@/components/product/product-card";
 import { ProductExperience } from "@/components/product/product-experience";
 import { Setting } from "@/components/setting";
@@ -13,6 +12,7 @@ import { absoluteUrl, business } from "@/config/business";
 import { commerce } from "@/config/commerce";
 import { defaultVariant, getCollectionBySlug, getProductBySlug, getRelatedProducts, getVisibleProducts, isPurchasable, variantLabel } from "@/lib/catalog";
 import { jsonLdString } from "@/lib/json-ld";
+import { deliveryDisclaimer } from "@/lib/policy-text";
 import { pageMetadata } from "@/lib/seo";
 
 export function generateStaticParams() {
@@ -88,9 +88,6 @@ function ComingSoonProduct({ product }: { product: Product }) {
           <p className="eyebrow mt-6">Coming soon</p>
           <h1 className="mt-2 text-3xl sm:text-4xl">{product.name}</h1>
           <p className="mt-3 text-ink-2">{product.summary}</p>
-          <p className="mt-4 text-xl">
-            <Price cents={product.priceCents} />
-          </p>
 
           <div className="mt-8 border border-line bg-surface p-5 text-sm leading-6 text-ink-2" role="status">
             <p className="font-medium text-ink">Not yet available to order</p>
@@ -209,7 +206,7 @@ function PurchasableProduct({ product }: { product: Product }) {
           )}
           <Detail title="Shipping">
             <p>
-              Orders are prepared for shipment within <Setting value={commerce.processingTime} label="processing time" />. Domestic delivery typically takes <Setting value={commerce.domesticDeliveryEstimate} label="delivery estimate" /> after dispatch. Shipping options and costs are shown at checkout before you pay.
+              Orders are processed within <Setting value={commerce.processingTime} label="processing time" />. Estimated US delivery is <Setting value={commerce.domesticDeliveryEstimate} label="delivery estimate" /> after dispatch. {deliveryDisclaimer} Shipping costs are calculated and displayed at checkout before you pay.
             </p>
             {product.shippingNote && <p className="mt-3">{product.shippingNote}</p>}
             <Link href="/shipping-policy" className="link mt-3 inline-block">Shipping policy</Link>
@@ -217,10 +214,10 @@ function PurchasableProduct({ product }: { product: Product }) {
           <Detail title="Returns">
             {product.returnable ? (
               <p>
-                This item can be returned within <Setting value={returnWindow} label="return window" />{returnWindow !== null && " days"} of delivery if it&rsquo;s unused and in its original packaging. Contact customer support to start a return.
+                This item can be returned within <Setting value={returnWindow} label="return window" />{returnWindow !== null && " days"} after delivery if it&rsquo;s unused and in the condition received. Contact customer support to start a return.
               </p>
             ) : (
-              <p>This item is final sale and can&rsquo;t be returned for a change of mind. Damaged, defective or incorrect items are still covered.</p>
+              <p>This item is final sale and isn&rsquo;t eligible for the standard return process. If it arrives damaged or incorrect, contact us {commerce.damagedOrIncorrect.reportWindow}.</p>
             )}
             <Link href="/return-policy" className="link mt-3 inline-block">Return &amp; Refund Policy</Link>
           </Detail>

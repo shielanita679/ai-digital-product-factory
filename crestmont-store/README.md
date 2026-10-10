@@ -5,8 +5,9 @@ Storefront for **CRESTMONT HOLDINGS LLC** (Missouri), built with Next.js 16
 
 > Before taking real orders, work through [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md).
 > The catalog contains the 12 planned launch products in **coming soon** status
-> (no photography, specifications or inventory yet), and unconfirmed business
-> terms appear on the site as highlighted "to be confirmed" placeholders.
+> (no public prices, photography, specifications or inventory yet), payments are
+> switched off (`commerce.paymentsEnabled = false`), and the order database is
+> not built. See also [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Getting started
 
@@ -28,7 +29,9 @@ npm run dev                  # http://localhost:3000
 | What | Where |
 | --- | --- |
 | Legal name, address, support email, hours | `src/config/business.ts` (single source of truth) |
-| Currency, shipping, returns, processing times | `src/config/commerce.ts` |
+| Currency, shipping, returns, refunds, payments switch | `src/config/commerce.ts` |
+| Policy effective date, buyer age, governing law | `src/config/policies.ts` |
+| Open infrastructure decisions | `src/config/operations.ts` |
 | Products (SKU, price, variants, inventory, weight, dimensions, status…) | `src/catalog/products.ts` |
 | Collections | `src/catalog/collections.ts` |
 | Navigation | `src/config/navigation.ts` |
@@ -53,7 +56,9 @@ dimensions, a product-specific shipping note, returnability and status
 valid references.
 
 ## Payments
-Checkout uses **Stripe Checkout** (hosted). The browser sends only SKUs and
+Payments are **off** until `commerce.paymentsEnabled` is set to `true`; until
+then no Stripe client is created even if Stripe variables exist in the
+environment. Checkout uses **Stripe Checkout** (hosted). The browser sends only SKUs and
 quantities; the server re-prices everything from the catalog, validates stock,
 and creates a Checkout Session. Card data is entered on Stripe's page and
 never reaches this server. Checkout refuses to start (and the site says so
@@ -63,7 +68,8 @@ return window and a support email are configured.
 ## Security
 CSP, HSTS, frame, referrer and permissions headers (`next.config.mjs`); Zod
 validation on every API; same-origin checks (CSRF) and per-IP rate limiting on
-public POST endpoints; honeypot fields on forms; signed Stripe webhooks; all
+public POST endpoints (in-memory — must be replaced before multi-instance
+production, see docs/ARCHITECTURE.md); honeypot fields on forms; signed Stripe webhooks; all
 secrets server-side only. Never commit `.env*` files.
 
 ## Deployment

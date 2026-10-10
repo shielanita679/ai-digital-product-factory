@@ -26,8 +26,6 @@ export const contactSchema = z.object({
 });
 export type ContactInput = z.infer<typeof contactSchema>;
 
-export const newsletterSchema = z.object({ email, company: honeypot });
-
 export const trackingSchema = z.object({
   orderNumber: cleanText(40).pipe(z.string().min(3, "Enter your order number.")),
   email,

@@ -44,3 +44,12 @@ export function Honeypot() {
     </div>
   );
 }
+
+/** Shown in place of a working form while message delivery isn't configured. */
+export function UnavailableNotice({ id }: { id: string }) {
+  return (
+    <p id={id} role="status" className="border border-notice-ink/20 bg-notice p-4 text-sm text-notice-ink">
+      This form isn&rsquo;t accepting messages yet. Please check back soon.
+    </p>
+  );
+}

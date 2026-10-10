@@ -2,11 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { CollectionTile } from "@/components/collection-tile";
-import { NewsletterForm } from "@/components/forms/newsletter-form";
 import { ArrowRightIcon, LockIcon, MailIcon, ReturnIcon, TruckIcon } from "@/components/icons";
 import { ProductGrid } from "@/components/product/product-card";
 import { Setting } from "@/components/setting";
-import { business } from "@/config/business";
+import { business, publicSupportSchedule } from "@/config/business";
 import { commerce } from "@/config/commerce";
 import { getCollections, getProductsInCollection, getPurchasableProducts, getVisibleProducts } from "@/lib/catalog";
 import { pageMetadata } from "@/lib/seo";
@@ -45,6 +44,7 @@ export default function HomePage() {
   // "New arrivals" language is only used once something can actually be bought.
   const hasAvailableProducts = getPurchasableProducts().length > 0;
   const returnWindow = commerce.returns.windowDays;
+  const support = publicSupportSchedule();
 
   return (
     <>
@@ -131,7 +131,7 @@ export default function HomePage() {
             <div>
               <dt className="font-medium">Straightforward returns</dt>
               <dd className="mt-1.5 text-sm leading-6 text-ink-2">
-                Eligible items can be returned within <Setting value={returnWindow} label="return window" />{returnWindow !== null && " days"} of delivery. The full terms are in our <Link href="/return-policy" className="link">Return &amp; Refund Policy</Link>.
+                Eligible items can be returned within <Setting value={returnWindow} label="return window" />{returnWindow !== null && " days"} of delivery, and final-sale items are marked on the product page. The full terms are in our <Link href="/return-policy" className="link">Return &amp; Refund Policy</Link>.
               </dd>
             </div>
             <div className="sm:col-span-2">
@@ -151,11 +151,11 @@ export default function HomePage() {
             Accepted payment methods are shown at checkout. Payments are processed by our payment provider over an encrypted connection.
           </InfoItem>
           <InfoItem icon={<TruckIcon />} title="Shipping" href="/shipping-policy" linkLabel="Shipping policy">
-            Orders are prepared within <Setting value={commerce.processingTime} label="processing time" />. Rates and delivery estimates appear at checkout.
+            Orders are processed within <Setting value={commerce.processingTime} label="processing time" />. Estimated US delivery is <Setting value={commerce.domesticDeliveryEstimate} label="delivery estimate" /> after dispatch.
           </InfoItem>
           <InfoItem icon={<MailIcon />} title="Customer support" href="/contact" linkLabel="Contact us">
-            Email us about orders, products or deliveries
-            {business.supportResponseTime ? <>. We reply {business.supportResponseTime}.</> : "."}
+            Contact us about orders, products or deliveries
+            {support ? <>. Support is available {support.hours}, and we aim to respond {support.responseTime}.</> : "."}
           </InfoItem>
           <InfoItem icon={<ReturnIcon />} title="Returns" href="/return-policy" linkLabel="Return policy">
             Contact customer support to start a return. We&rsquo;ll confirm eligibility and send instructions.
@@ -163,18 +163,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* G. Newsletter */}
-      <section className="bg-ink text-paper">
-        <div className="page-x grid items-center gap-8 py-14 sm:py-16 lg:grid-cols-2">
-          <div>
-            <h2 className="text-3xl sm:text-4xl">Get product updates and new arrivals.</h2>
-            <p className="mt-3 text-paper/70">We&rsquo;ll email you when products are added to the store. Unsubscribe at any time.</p>
-          </div>
-          <div className="[&_.field]:border-paper/30 [&_.field]:bg-transparent [&_.field]:text-paper [&_.field]:placeholder:text-paper/50 [&_.field]:focus:border-paper [&_.btn-primary]:bg-paper [&_.btn-primary]:text-ink [&_.btn-primary]:hover:bg-surface [&_.link]:text-paper [&_p]:text-paper/60">
-            <NewsletterForm />
-          </div>
-        </div>
-      </section>
     </>
   );
 }

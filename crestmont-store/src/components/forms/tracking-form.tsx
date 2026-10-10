@@ -1,8 +1,8 @@
 "use client";
 
-import { Honeypot, useSubmit } from "./use-submit";
+import { Honeypot, UnavailableNotice, useSubmit } from "./use-submit";
 
-export function TrackingForm() {
+export function TrackingForm({ available }: { available: boolean }) {
   const { state, submit } = useSubmit("/api/order-tracking");
 
   if (state.status === "success") {
@@ -23,6 +23,8 @@ export function TrackingForm() {
       }}
     >
       <Honeypot />
+      {!available && <UnavailableNotice id="tracking-unavailable" />}
+      <fieldset disabled={!available} className="contents">
       <div>
         <label htmlFor="t-order" className="field-label">Order number</label>
         <input id="t-order" name="orderNumber" required maxLength={40} className="field" placeholder="As shown in your confirmation email" />
@@ -35,6 +37,7 @@ export function TrackingForm() {
       <button type="submit" className="btn-primary w-full sm:w-auto sm:justify-self-start" disabled={state.status === "submitting"}>
         {state.status === "submitting" ? "Submitting…" : "Request order status"}
       </button>
+      </fieldset>
     </form>
   );
 }

@@ -11,11 +11,14 @@ export function ImagePending({ name, collection, size = "card" }: { name: string
       className="flex aspect-[4/5] w-full flex-col justify-between bg-surface p-4 text-ink-2 sm:p-5"
       style={{ backgroundImage: "linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-2) 100%)" }}
     >
-      {size !== "thumb" && collection && <span className="eyebrow">{collection}</span>}
-      <span className={size === "large" ? "font-serif text-3xl leading-tight text-ink sm:text-4xl" : size === "thumb" ? "sr-only" : "font-serif text-lg leading-snug text-ink"}>
-        {name.replace(/^Crestmont\s+/, "")}
-      </span>
-      {size !== "thumb" && <span className="text-[0.75rem] text-muted">Photography coming soon</span>}
+      {/* Top row is left clear on cards so status badges never overlap the name. */}
+      <span className="eyebrow">{size === "large" && collection ? collection : ""}</span>
+      <div>
+        <span className={size === "large" ? "block font-serif text-3xl leading-tight text-ink sm:text-4xl" : size === "thumb" ? "sr-only" : "block font-serif text-lg leading-snug text-ink"}>
+          {name.replace(/^Crestmont\s+/, "")}
+        </span>
+        {size !== "thumb" && <span className="mt-2 block text-[0.75rem] text-muted">Photography coming soon</span>}
+      </div>
     </div>
   );
 }

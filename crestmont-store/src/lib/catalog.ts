@@ -120,11 +120,17 @@ export type SortKey = "featured" | "price-asc" | "price-desc" | "name";
 
 export function sortProducts(list: Product[], sort: SortKey): Product[] {
   const copy = [...list];
+  // Price sorts only order purchasable products; pre-launch products keep
+  // their catalog order at the end, so planned prices can't be inferred.
+  const byPrice = (dir: 1 | -1) => {
+    const priced = copy.filter(isPurchasable).sort((a, b) => dir * (priceRange(a).min - priceRange(b).min));
+    return [...priced, ...copy.filter((p) => !isPurchasable(p))];
+  };
   switch (sort) {
     case "price-asc":
-      return copy.sort((a, b) => priceRange(a).min - priceRange(b).min);
+      return byPrice(1);
     case "price-desc":
-      return copy.sort((a, b) => priceRange(b).min - priceRange(a).min);
+      return byPrice(-1);
     case "name":
       return copy.sort((a, b) => a.name.localeCompare(b.name));
     default:

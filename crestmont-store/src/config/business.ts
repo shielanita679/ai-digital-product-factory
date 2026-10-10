@@ -44,35 +44,36 @@ export const business = {
   domain,
 
   /**
-   * Customer-support mailbox. Defaults to support@<your domain> once
-   * NEXT_PUBLIC_SITE_URL is set; override here if you use a different
-   * mailbox. It must be a real, monitored inbox before launch.
+   * Customer-support mailbox, from the SUPPORT_EMAIL environment variable.
+   * It must be a real, monitored inbox on the store's own domain. Never
+   * derive or guess it. Set at build time (it is rendered into pages).
    */
-  supportEmail: domain ? `support@${domain}` : null as string | null,
+  supportEmail: (process.env.SUPPORT_EMAIL?.trim() || null) as string | null,
   /** Mailbox for privacy/data requests. Defaults to the support inbox. */
   privacyEmail: null as string | null,
 
-  /** Public phone number, if you offer phone support. Leave null otherwise. */
+  /** Public phone number, if phone support is offered. None at launch. */
   phone: null as string | null,
 
-  /**
-   * Hours during which support emails are answered, e.g.
-   * "Monday–Friday, 9:00 a.m.–5:00 p.m. Central Time". Leave null until set.
-   */
-  supportHours: null as string | null,
+  /** Customer-support availability (when messages are answered). */
+  supportHours: "Monday–Friday, 9:00 a.m.–5:00 p.m. Central Time" as string | null,
 
-  /**
-   * Typical reply time you can reliably meet, e.g. "within 1–2 business days".
-   * Only fill this in if you can consistently meet it.
-   */
-  supportResponseTime: null as string | null,
-
-  /** Effective date shown on every policy page. Update when policies change. */
-  policiesLastUpdated: "2026-10-10",
+  /** Target time for a first response — not a guarantee that every issue is resolved in that time. */
+  supportResponseTime: "within 2 business days" as string | null,
 
   /** Public social profiles (real accounts only). */
   social: [] as { label: string; url: string }[],
 } as const;
+
+/**
+ * Support schedule for public display. Returned only once a real support
+ * inbox and production domain are configured, so the site never advertises
+ * availability for a support channel that doesn't exist yet.
+ */
+export function publicSupportSchedule(): { hours: string; responseTime: string } | null {
+  if (!business.supportEmail || !business.domain || !business.supportHours || !business.supportResponseTime) return null;
+  return { hours: business.supportHours, responseTime: business.supportResponseTime };
+}
 
 export function privacyContactEmail(): string | null {
   return business.privacyEmail ?? business.supportEmail;

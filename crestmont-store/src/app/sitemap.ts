@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
-import { absoluteUrl, business } from "@/config/business";
+import { absoluteUrl } from "@/config/business";
+import { policies } from "@/config/policies";
 import { getCollections, getVisibleProducts } from "@/lib/catalog";
 
 const staticPaths = [
@@ -9,7 +10,7 @@ const staticPaths = [
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const policyDate = new Date(business.policiesLastUpdated);
+  const policyDate = policies.effectiveDate ? new Date(policies.effectiveDate) : undefined;
   return [
     ...staticPaths.map((p) => ({ url: absoluteUrl(p), lastModified: p.includes("policy") || p.includes("terms") ? policyDate : undefined })),
     ...getCollections().map((c) => ({ url: absoluteUrl(`/collections/${c.slug}`) })),

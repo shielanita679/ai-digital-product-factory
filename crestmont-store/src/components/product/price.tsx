@@ -1,6 +1,6 @@
 import type { Product } from "@/catalog/types";
 import { formatMoney } from "@/config/commerce";
-import { priceRange } from "@/lib/catalog";
+import { isPurchasable, priceRange } from "@/lib/catalog";
 
 export function Price({ cents, compareAtCents, className = "" }: { cents: number; compareAtCents?: number; className?: string }) {
   const onSale = compareAtCents !== undefined && compareAtCents > cents;
@@ -17,8 +17,13 @@ export function Price({ cents, compareAtCents, className = "" }: { cents: number
   );
 }
 
-/** Card-level price: "From $X" when variants are priced differently. */
+/**
+ * Card-level price: "From $X" when variants are priced differently.
+ * Only purchasable products expose a price; planned prices of pre-launch
+ * products are internal and never rendered.
+ */
 export function ProductPrice({ product }: { product: Product }) {
+  if (!isPurchasable(product)) return <span className="text-muted">Not yet available to order</span>;
   const { min, max } = priceRange(product);
   const cheapest = product.variants.find((v) => v.priceCents === min);
   if (min !== max) return <span className="tabular-nums">From {formatMoney(min)}</span>;

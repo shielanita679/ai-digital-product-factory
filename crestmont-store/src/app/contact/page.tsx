@@ -3,8 +3,8 @@ import Link from "next/link";
 
 import { ContactForm } from "@/components/forms/contact-form";
 import { PageHeader } from "@/components/page-header";
-import { Setting } from "@/components/setting";
-import { addressLines, business } from "@/config/business";
+import { addressLines, business, publicSupportSchedule } from "@/config/business";
+import { isContactDeliveryConfigured } from "@/lib/deliver";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -14,6 +14,7 @@ export const metadata: Metadata = pageMetadata({
 });
 
 export default function ContactPage() {
+  const support = publicSupportSchedule();
   return (
     <>
       <PageHeader
@@ -23,31 +24,31 @@ export default function ContactPage() {
       />
       <div className="page-x grid gap-14 py-12 sm:py-16 lg:grid-cols-12">
         <div className="lg:col-span-7">
-          <ContactForm />
+          <ContactForm available={isContactDeliveryConfigured()} />
         </div>
         <aside className="space-y-8 text-sm lg:col-span-4 lg:col-start-9">
-          <div>
-            <h2 className="eyebrow">Email</h2>
-            <p className="mt-2 text-base">
-              {business.supportEmail ? (
+          {business.supportEmail && (
+            <div>
+              <h2 className="eyebrow">Email</h2>
+              <p className="mt-2 text-base">
                 <a href={`mailto:${business.supportEmail}`} className="link">{business.supportEmail}</a>
-              ) : (
-                <Setting value={null} label="support email" />
-              )}
-            </p>
-          </div>
+              </p>
+            </div>
+          )}
           {business.phone && (
             <div>
               <h2 className="eyebrow">Phone</h2>
               <p className="mt-2 text-base"><a href={`tel:${business.phone}`} className="link">{business.phone}</a></p>
             </div>
           )}
-          <div>
-            <h2 className="eyebrow">Response times</h2>
-            <p className="mt-2 leading-6 text-ink-2">
-              We answer messages during <Setting value={business.supportHours} label="support hours" /> and aim to reply <Setting value={business.supportResponseTime} label="response time" />. Messages received outside those hours are answered on the next business day.
-            </p>
-          </div>
+          {support && (
+            <div>
+              <h2 className="eyebrow">Support hours</h2>
+              <p className="mt-2 leading-6 text-ink-2">
+                Customer support is available {support.hours}. We aim to send a first response {support.responseTime}; some issues may take longer to fully resolve.
+              </p>
+            </div>
+          )}
           <div>
             <h2 className="eyebrow">Mailing address</h2>
             <address className="mt-2 leading-6 text-ink-2 not-italic">

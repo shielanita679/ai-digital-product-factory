@@ -4,6 +4,8 @@ import Link from "next/link";
 import { TrackingForm } from "@/components/forms/tracking-form";
 import { PageHeader } from "@/components/page-header";
 import { business } from "@/config/business";
+import { commerce } from "@/config/commerce";
+import { isContactDeliveryConfigured } from "@/lib/deliver";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -20,13 +22,13 @@ export default function OrderTrackingPage() {
         <div className="lg:col-span-6">
           <h2 className="font-serif text-2xl">Already shipped?</h2>
           <p className="mt-2 text-ink-2">
-            When your order ships, we email a shipping confirmation to the address you used at checkout, including tracking details when the carrier provides them. The tracking link in that email is the fastest way to see where your package is. Check your spam or promotions folder if you can&rsquo;t find it.
+            When your order ships, we email a shipping confirmation to the address you used at checkout. Tracking information is provided {commerce.trackingPolicy}. The tracking link in that email is the fastest way to see where your package is. Check your spam or promotions folder if you can&rsquo;t find it.
           </p>
           <h2 className="mt-10 font-serif text-2xl">Request an order status update</h2>
           <p className="mt-2 mb-6 text-ink-2">
             Enter your order number (it starts with &ldquo;CH-&rdquo; and appears in your confirmation email) and the email you used at checkout. Our support team will look up the order and email you its current status.
           </p>
-          <TrackingForm />
+          <TrackingForm available={isContactDeliveryConfigured()} />
         </div>
         <aside className="text-sm lg:col-span-4 lg:col-start-9">
           <div className="border border-line bg-surface p-6">

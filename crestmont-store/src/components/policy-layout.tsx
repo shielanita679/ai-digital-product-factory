@@ -2,19 +2,20 @@ import Link from "next/link";
 
 import { addressLines, business } from "@/config/business";
 import { policyPages } from "@/config/navigation";
+import { formatPolicyDate } from "@/config/policies";
 
 import { Breadcrumbs } from "./breadcrumbs";
 
-const updated = new Date(`${business.policiesLastUpdated}T12:00:00Z`).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 
 export function PolicyLayout({ title, path, intro, children }: { title: string; path: string; intro?: React.ReactNode; children: React.ReactNode }) {
+  const effective = formatPolicyDate();
   return (
     <div className="page-x py-10 sm:py-14">
       <Breadcrumbs items={[{ label: title, href: path }]} />
       <div className="mt-6 grid gap-12 lg:grid-cols-12">
         <div className="lg:col-span-8">
           <h1 className="text-4xl sm:text-5xl">{title}</h1>
-          <p className="mt-3 text-[0.8125rem] text-muted">Last updated {updated}</p>
+          <p className="mt-3 text-[0.8125rem] text-muted">{effective ? `Last updated ${effective}` : "Pre-launch version — the effective date will be set when the store opens."}</p>
           {intro && <div className="prose-store mt-6">{intro}</div>}
           <div className="prose-store mt-10">{children}</div>
         </div>

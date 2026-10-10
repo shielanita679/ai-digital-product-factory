@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { NewsletterForm } from "@/components/forms/newsletter-form";
 import { Logo } from "@/components/logo";
 import { addressLines, business } from "@/config/business";
 import { footerNav } from "@/config/navigation";
@@ -26,7 +25,7 @@ export function SiteFooter() {
   return (
     <footer className="mt-auto border-t border-line bg-surface">
       <div className="page-x grid gap-12 py-14 lg:grid-cols-12 lg:py-16">
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-5">
           <Logo />
           <address className="mt-6 text-sm leading-6 text-ink-2 not-italic">
             <span className="font-medium text-ink">{business.legalName}</span>
@@ -40,17 +39,10 @@ export function SiteFooter() {
             </p>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 lg:col-span-5">
+        <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 lg:col-span-6 lg:col-start-7">
           <Column title="Shop" links={footerNav.shop} />
           <Column title="Help" links={footerNav.help} />
           <Column title="Company" links={footerNav.company} />
-        </div>
-        <div className="lg:col-span-3">
-          <h2 className="eyebrow">Newsletter</h2>
-          <p className="mt-4 text-sm text-ink-2">Get product updates and new arrivals.</p>
-          <div className="mt-4">
-            <NewsletterForm compact />
-          </div>
         </div>
       </div>
       <div className="border-t border-line">
