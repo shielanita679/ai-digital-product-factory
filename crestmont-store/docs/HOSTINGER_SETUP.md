@@ -40,7 +40,14 @@ Notes from the deployment:
   the build uses webpack, not Turbopack. Prisma 7's client has no native
   engine and is unaffected.
 - Hostinger cron output only captures the **last** command of a cron line, and
-  commands are limited to 255 characters.
+  commands are limited to 255 characters. Crontab treats `%` as a newline, so
+  avoid `curl -w '%{http_code}'`; use `curl -sSf` to see the status instead.
+- **Secret rotation** (database password and `CRON_SECRET` were rotated on
+  2026-10-10): change the database user's password, replace the full
+  environment-variable set (the API is a full replace and values are masked on
+  read), start a new build (its `migrate deploy` step confirms the new
+  credentials), then recreate the cron with the new secret and delete the old
+  one. The old secret should then get 404.
 - **Health check:** `POST /api/internal/db-health` with
   `Authorization: Bearer <CRON_SECRET>` returns server version, applied
   migrations, tables, CHECK-constraint/index counts and row counts (never
