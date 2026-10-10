@@ -55,13 +55,14 @@ Still unresolved:
 - [ ] Sales tax: finalize setup, then decide on `STRIPE_AUTOMATIC_TAX`.
 
 ## 5. Infrastructure — Hostinger (`docs/HOSTINGER_SETUP.md`)
-- [ ] Confirm the Hostinger plan (Node.js app support) and set `operations.hostingProvider`.
-- [ ] Create the Crestmont MySQL database + user (separate from any other app).
-- [ ] Set `DATABASE_URL` (server-only) and `CRON_SECRET` in the Node.js app's environment.
-- [ ] Back up, then run `npm run db:migrate:deploy` against the Hostinger database.
-- [ ] Deploy with application root `crestmont-store`, build `npm run build`, start `npm run start`, Node 22.x.
-- [ ] Set `operations.orderDatabaseEnabled = true`, redeploy.
-- [ ] Add the Hostinger cron job for `/api/internal/release-reservations`.
+- [x] Hostinger Business plan confirmed; `operations.hostingProvider` set.
+- [x] Crestmont MySQL database + user created (separate from every other app).
+- [x] `DATABASE_URL` (server-only) and `CRON_SECRET` set in the Node.js app's environment.
+- [x] Migration applied with `prisma migrate deploy` (via `build:hostinger`).
+- [x] Deployed: application root `crestmont-store`, Node 22, Next.js.
+- [x] `operations.orderDatabaseEnabled = true`.
+- [x] Hostinger cron job for `/api/internal/release-reservations` (every 15 min).
+- [ ] Connect the real Crestmont domain (currently a temporary `*.hostingersite.com` subdomain), update `NEXT_PUBLIC_SITE_URL`, rebuild, update the cron URL.
 - [ ] Confirm whether the plan runs one Node.js process; if not, replace the in-memory rate-limit store.
 - [ ] Register each active SKU and record its **counted** initial stock through the service (ledgered).
 - [ ] Configure database backups.

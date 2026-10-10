@@ -16,6 +16,43 @@ below differs, look for the closest equivalent or ask Hostinger support.
 Never paste passwords, `DATABASE_URL` or API keys into chat, issues, commits or
 the repository.
 
+## Current deployment (October 2026)
+
+| Item | Value |
+| --- | --- |
+| Hosting plan | Hostinger Business Web Hosting (hPanel account `u868357127`) |
+| Website | `forestgreen-gazelle-708337.hostingersite.com` — **temporary** Hostinger subdomain, dedicated to Crestmont |
+| Database | `u868357127_crestmont` (MariaDB 11.8), user `u868357127_crestapp`, assigned only to the Crestmont website; app connects to `127.0.0.1:3306` |
+| Source | GitHub `shielanita679/ai-digital-product-factory`, branch `claude/dreamy-johnson-jnp3tw`, application root `crestmont-store` |
+| Node.js app | Next.js, Node 22, npm, output `.next`, build script **`build:hostinger`** (`npm run db:migrate:deploy && npm run build`) |
+| Environment | `DATABASE_URL`, `CRON_SECRET`, `NEXT_PUBLIC_SITE_URL`, `STRIPE_AUTOMATIC_TAX=false` (set in hPanel / API; never in git) |
+| SSL | Platform-managed certificate for the subdomain; HTTP→HTTPS redirect on |
+| Cron | Every 15 minutes: authenticated POST to `/api/internal/release-reservations` |
+
+Notes from the deployment:
+- **Migrations run during the build** (`build:hostinger`), on Hostinger's
+  server where the database is reachable at `127.0.0.1`. `prisma migrate
+  deploy` only applies pending migrations and never resets data. The external
+  MySQL host (`srvNNNN.hstgr.io`) is only needed for connections from outside
+  Hostinger.
+- Hostinger's build servers have an older glibc, so Next.js falls back to its
+  WebAssembly compiler (warnings in the build log are expected). This is why
+  the build uses webpack, not Turbopack. Prisma 7's client has no native
+  engine and is unaffected.
+- Hostinger cron output only captures the **last** command of a cron line, and
+  commands are limited to 255 characters.
+- **Health check:** `POST /api/internal/db-health` with
+  `Authorization: Bearer <CRON_SECRET>` returns server version, applied
+  migrations, tables, CHECK-constraint/index counts and row counts (never
+  data). Unauthenticated requests get 404.
+- **Smoke test:** `node scripts/smoke-test.mjs https://<site>` crawls the site
+  and verifies the pre-launch safeguards (no prices, no purchase buttons,
+  closed checkout/payments, safe forms, protected internal endpoints,
+  canonical/robots/sitemap). It can be run from Hostinger with the absolute
+  Node path `/opt/alt/alt-nodejs22/root/usr/bin/node`.
+- When the real domain is connected: attach it to this website, update
+  `NEXT_PUBLIC_SITE_URL`, rebuild, and update the cron URL.
+
 ---
 
 ## 1. Create the MySQL database
@@ -128,7 +165,7 @@ upload the code) and use:
 | **Root / application directory** | `crestmont-store` |
 | Node.js version | **22.x** (minimum 20.19) |
 | Install command | `npm ci` (or `npm install`) — runs `prisma generate` automatically |
-| **Build command** | `npm run build` (= `prisma generate && next build --webpack`) |
+| **Build command** | `build:hostinger` script (= `npm run db:migrate:deploy && npm run build`); plain `npm run build` if you run migrations separately |
 | **Start command** | `npm run start` (= `next start`; listens on the `PORT` Hostinger provides) |
 | Output directory (if asked) | `.next` |
 | Environment variables | step 5 |
