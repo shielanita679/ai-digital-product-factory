@@ -24,7 +24,7 @@ const source = files(path.join(root, "src")).filter((f) => /\.(ts|tsx)$/.test(f)
 const nonTest = source.filter((f) => !f.endsWith(".test.ts"));
 
 /** Modules that hold credentials or perform privileged writes. */
-const SERVER_ONLY = ["@/lib/db/prisma", "@/lib/db/client-factory", "@/lib/orders/repository", "@/lib/orders/service", "@/lib/orders/webhook", "@/lib/stripe", "@/lib/deliver", "@/lib/rate-limit", "@/generated/prisma"];
+const SERVER_ONLY = ["@/lib/db/prisma", "@/lib/db/client-factory", "@/lib/orders/repository", "@/lib/orders/service", "@/lib/orders/webhook", "@/lib/stripe", "@/lib/deliver", "@/lib/rate-limit", "@/lib/internal-auth", "@/lib/db/health", "@/generated/prisma"];
 
 describe("server-only database access", () => {
   it("no client component imports a database, payment or other server-only module", () => {
@@ -39,7 +39,7 @@ describe("server-only database access", () => {
   });
 
   it("credential-bearing modules are guarded with server-only", () => {
-    for (const rel of ["src/lib/db/prisma.ts", "src/lib/orders/repository.ts", "src/lib/orders/webhook.ts", "src/lib/stripe.ts", "src/lib/deliver.ts", "src/lib/rate-limit.ts"]) {
+    for (const rel of ["src/lib/db/prisma.ts", "src/lib/orders/repository.ts", "src/lib/orders/webhook.ts", "src/lib/stripe.ts", "src/lib/deliver.ts", "src/lib/rate-limit.ts", "src/lib/internal-auth.ts"]) {
       expect(readFileSync(path.join(root, rel), "utf8")).toMatch(/^import "server-only";/m);
     }
   });
