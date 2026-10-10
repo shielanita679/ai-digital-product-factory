@@ -73,9 +73,10 @@ describe("server-only database access", () => {
     expect(parseDatabaseUrl("")).toBeNull();
   });
 
-  it("the database stays disabled until the operator switches it on, even with DATABASE_URL present", () => {
-    expect(operations.orderDatabaseEnabled).toBe(false);
-    expect(isOrderDatabaseEnabled({ DATABASE_URL: "mysql://u:p@h:3306/db" })).toBe(false);
+  it("database features need both the operator switch and a valid DATABASE_URL", () => {
+    expect(isOrderDatabaseEnabled({})).toBe(false);
+    expect(isOrderDatabaseEnabled({ DATABASE_URL: "not-a-url" })).toBe(false);
+    expect(isOrderDatabaseEnabled({ DATABASE_URL: "mysql://u:p@h:3306/db" })).toBe(operations.orderDatabaseEnabled);
   });
 });
 

@@ -10,7 +10,7 @@ export const operations = {
    * "Hostinger Business Web Hosting". The app has no provider-specific code
    * and remains portable.
    */
-  hostingProvider: null as string | null,
+  hostingProvider: "Hostinger Business Web Hosting" as string | null,
 
   /**
    * Order/inventory database: the Hostinger MySQL database for CRESTMONT
@@ -18,7 +18,7 @@ export const operations = {
    * `prisma migrate deploy` has been run against it and DATABASE_URL is set
    * (docs/HOSTINGER_SETUP.md). While false, no code path touches a database.
    */
-  orderDatabaseEnabled: false,
+  orderDatabaseEnabled: true,
 
   /**
    * The rate limiter's store (lib/rate-limit.ts). "memory" keeps counters in
