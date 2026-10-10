@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1500" viewBox="0 0 1200 1500" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="vg1" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#eee2d8"/><stop offset="1" stop-color="#e4d5c8"/></linearGradient><linearGradient id="vg2" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#e4d5c8"/><stop offset="1" stop-color="#d4c1b0"/></linearGradient><linearGradient id="dg3" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#dbcfb9"/><stop offset="1" stop-color="#b6ab97"/></linearGradient><filter id="sh4" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="18.24"/></filter></defs><rect width="1200" height="930" fill="url(#vg1)"/><rect y="930" width="1200" height="570" fill="url(#vg2)"/>
+  <rect y="929" width="1200" height="2" fill="#ffffff" opacity="0.25"/><ellipse cx="600" cy="1147.6" rx="459.8" ry="30.4" fill="#2a241c" opacity="0.24" filter="url(#sh4)"/>
+  <path d="M220 627 H980 Q1018 627 1018 684 V1102 Q1018 1140 961 1140 H239 Q182 1140 182 1102 V684 Q182 627 220 627 Z" fill="url(#dg3)"/>
+  <path d="M212.4 676.4 H987.6" stroke="#2f2b27" stroke-width="15.2"/>
+  <path d="M212.4 676.4 H987.6" stroke="#c7b28a" stroke-width="5.699999999999999" stroke-dasharray="5.699999999999999 5.699999999999999"/>
+  <rect x="843.2" y="657.4" width="91.19999999999999" height="38" rx="7.6" fill="#b49a6a"/>
+  <path d="M934.4 676.4 q 76 7.6 87.39999999999999 76" stroke="#7c5236" stroke-width="19" fill="none" stroke-linecap="round"/>
+  <rect x="250.39999999999998" y="1007" width="228" height="68.39999999999999" rx="7.6" fill="#a39987" opacity="0.35"/></svg>
