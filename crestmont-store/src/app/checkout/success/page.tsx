@@ -16,6 +16,11 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Display only. Reaching this page proves nothing about payment and changes
+ * nothing: orders are marked paid and stock is deducted solely by the
+ * verified Stripe webhook.
+ */
 async function loadSession(id: string | undefined): Promise<Stripe.Checkout.Session | null> {
   const stripe = getStripe();
   if (!stripe || !id || !/^cs_(test|live)_[A-Za-z0-9]{10,250}$/.test(id)) return null;

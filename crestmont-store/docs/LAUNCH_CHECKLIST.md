@@ -44,6 +44,7 @@ Still unresolved:
 - Don't use "Best seller", "Popular" or similar without real sales data.
 
 ## 4. Environment variables (see `.env.example`) — Crestmont's own values only
+- [ ] `DATABASE_URL`, `CRON_SECRET` — see section 5.
 - [ ] `NEXT_PUBLIC_SITE_URL` (build time)
 - [ ] `SUPPORT_EMAIL` — real, monitored inbox (build time). Support hours and
       response time are displayed only once this and the domain are set.
@@ -53,15 +54,23 @@ Still unresolved:
       Stripe account. Webhook endpoint: `https://<domain>/api/stripe/webhook`.
 - [ ] Sales tax: finalize setup, then decide on `STRIPE_AUTOMATIC_TAX`.
 
-## 5. Infrastructure — `src/config/operations.ts`, `docs/ARCHITECTURE.md`
-- [ ] Choose hosting provider.
-- [ ] Build the order & inventory database in a **new, separate** Crestmont
-      Supabase project.
-- [ ] Replace the in-memory rate limiter with a shared store.
+## 5. Infrastructure — Hostinger (`docs/HOSTINGER_SETUP.md`)
+- [ ] Confirm the Hostinger plan (Node.js app support) and set `operations.hostingProvider`.
+- [ ] Create the Crestmont MySQL database + user (separate from any other app).
+- [ ] Set `DATABASE_URL` (server-only) and `CRON_SECRET` in the Node.js app's environment.
+- [ ] Back up, then run `npm run db:migrate:deploy` against the Hostinger database.
+- [ ] Deploy with application root `crestmont-store`, build `npm run build`, start `npm run start`, Node 22.x.
+- [ ] Set `operations.orderDatabaseEnabled = true`, redeploy.
+- [ ] Add the Hostinger cron job for `/api/internal/release-reservations`.
+- [ ] Confirm whether the plan runs one Node.js process; if not, replace the in-memory rate-limit store.
+- [ ] Register each active SKU and record its **counted** initial stock through the service (ledgered).
+- [ ] Configure database backups.
 
 ## 6. Payments
 - [ ] Enable only the payment methods you want in Stripe; the site never lists methods itself.
-- [ ] Test order end to end in Stripe test mode.
+- [ ] Test order end to end in Stripe test mode: confirm the order row,
+      `SALE` ledger rows and stock change in the Crestmont MySQL database, and that
+      re-sending the webhook from the Stripe dashboard changes nothing.
 - [ ] Never state or imply endorsement by Stripe, card networks, Wise, Slash or any bank.
 
 ## 7. Final QA

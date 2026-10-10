@@ -4,6 +4,7 @@ import { operations } from "@/config/operations";
 import { policies } from "@/config/policies";
 import { products } from "@/catalog/products";
 import { activationIssues, getPurchasableProducts } from "@/lib/catalog";
+import { exposedSecretVariables, isOrderDatabaseEnabled, readDatabaseConfig } from "@/lib/db/config";
 
 /**
  * Lists every business term, credential, catalog item or infrastructure
@@ -43,11 +44,19 @@ export function getLaunchIssues(): string[] {
 
   // Infrastructure
   need(operations.hostingProvider, "Hosting provider is not selected (config/operations.ts).");
-  if (!operations.orderDatabaseConfigured) {
-    issues.push("Order & inventory database is not built (planned: a separate Crestmont Supabase project — see docs/ARCHITECTURE.md).");
+  if (!readDatabaseConfig()) {
+    issues.push("DATABASE_URL is not set to the Crestmont Hostinger MySQL database — see docs/HOSTINGER_SETUP.md.");
   }
-  if (operations.rateLimiter === "in_memory") {
-    issues.push("Rate limiter is in-memory only and gives no distributed protection; replace before production (lib/rate-limit.ts).");
+  if (!process.env.CRON_SECRET || process.env.CRON_SECRET.length < 32) {
+    issues.push("CRON_SECRET is not set (32+ characters) — needed for the scheduled reservation-release job.");
+  }
+  if (!operations.orderDatabaseEnabled) {
+    issues.push("Order database is not enabled (operations.orderDatabaseEnabled = false) — run `prisma migrate deploy` on the Hostinger database first.");
+  }
+  const exposed = exposedSecretVariables();
+  if (exposed.length) issues.push(`SECURITY: secret-looking values in public variables: ${exposed.join(", ")}.`);
+  if (operations.rateLimiter === "memory") {
+    issues.push("Rate limiter is per-process (memory) — confirm Hostinger runs a single Node.js process, or replace the store (lib/rate-limit.ts).");
   }
 
   // Catalog
@@ -83,6 +92,7 @@ export function getCheckoutBlockers(): string[] {
   if (!commerce.domesticDeliveryEstimate) issues.push("Domestic delivery estimate is not set (config/commerce.ts).");
   if (commerce.returns.windowDays === null) issues.push("Return window is not set (config/commerce.ts).");
   if (!business.supportEmail) issues.push("Support email: SUPPORT_EMAIL is not set.");
+  if (!isOrderDatabaseEnabled()) issues.push("Order database is not enabled and configured (orders, reservations and stock can't be recorded).");
   if (getPurchasableProducts().length === 0) issues.push("No products are available for purchase yet (all are draft or coming soon).");
   return issues;
 }

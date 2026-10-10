@@ -1,14 +1,20 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
+import { isOrderDatabaseEnabled } from "@/lib/db/config";
+import { processStripeEvent } from "@/lib/orders/webhook";
 import { getStripe } from "@/lib/stripe";
 
 /**
- * Stripe webhook. Configure in the Stripe dashboard pointing at
- * https://<your-domain>/api/stripe/webhook with the events below, and set
- * STRIPE_WEBHOOK_SECRET to that endpoint's signing secret.
+ * Stripe webhook — the single authority for payment outcomes.
  *
- * Every request is verified against the signing secret before use.
+ * Endpoint: https://<domain>/api/stripe/webhook, subscribed to the events in
+ * HANDLED_STRIPE_EVENTS (lib/orders/stripe-events.ts). Every request is
+ * signature-verified before use. Processing is idempotent in the database,
+ * so Stripe's retries and duplicate deliveries are safe.
+ *
+ * Returns 503 while payments or the order database are disabled, so Stripe
+ * keeps retrying instead of an event being silently dropped.
  */
 export async function POST(request: Request) {
   const stripe = getStripe();
@@ -25,26 +31,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  switch (event.type) {
-    case "checkout.session.completed":
-    case "checkout.session.async_payment_succeeded": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      if (session.payment_status === "paid") {
-        // Fulfillment hook: forward to your order management / fulfillment
-        // system and decrement inventory here. Stripe also keeps the full
-        // order (line items, shipping address) on the Checkout Session.
-        console.info(`Order paid: ${session.metadata?.order_reference ?? session.id} — ${session.amount_total} ${session.currency}`);
-      }
-      break;
-    }
-    case "checkout.session.async_payment_failed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      console.warn(`Payment failed for order ${session.metadata?.order_reference ?? session.id}`);
-      break;
-    }
-    default:
-      break;
+  if (!isOrderDatabaseEnabled()) {
+    console.error(`Stripe event ${event.id} received but the order database is not enabled`);
+    return NextResponse.json({ error: "Order database not configured" }, { status: 503 });
   }
 
-  return NextResponse.json({ received: true });
+  const outcome = await processStripeEvent(event);
+  return NextResponse.json({ received: true, result: outcome.result }, { status: outcome.ok ? 200 : 500 });
 }

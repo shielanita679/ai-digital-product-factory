@@ -1,0 +1,225 @@
+// CRESTMONT HOLDINGS LLC — order & inventory database (Hostinger MySQL/MariaDB).
+//
+// Money:  Int, minor units (cents). $29.99 = 2999. Never floating point.
+// Time:   DATETIME(3), UTC.
+// Rules that Prisma can't express (CHECK constraints) are added by hand in the
+// migration SQL — see prisma/migrations/*/migration.sql.
+// All writes happen server-side in src/lib/orders/service.ts.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum PaymentStatus {
+  PENDING             // checkout started, not paid
+  PROCESSING          // checkout completed; delayed payment method still clearing
+  PAID
+  PARTIALLY_REFUNDED
+  REFUNDED
+  FAILED              // delayed payment failed
+  EXPIRED             // checkout session expired unpaid
+  CANCELLED           // checkout abandoned before a session existed
+}
+
+enum FulfillmentStatus {
+  UNFULFILLED
+  ON_HOLD
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
+enum ReservationStatus {
+  HELD
+  CONVERTED
+  RELEASED
+}
+
+enum StripeEventStatus {
+  PROCESSING
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+enum MovementType {
+  INITIAL_STOCK
+  SALE
+  REFUND_RESTOCK
+  CANCELLATION_RESTOCK
+  RETURN_RESTOCK
+  MANUAL_ADJUSTMENT
+}
+
+enum ShipmentStatus {
+  PENDING
+  LABEL_CREATED
+  IN_TRANSIT
+  DELIVERED
+  EXCEPTION
+  RETURNED
+  CANCELLED
+}
+
+model Order {
+  id                      String   @id @default(uuid()) @db.Char(36)
+  /// Public reference, random: CH-XXXX-XXXX. Never derived from the id.
+  orderNumber             String   @unique @map("order_number") @db.VarChar(16)
+
+  stripeCheckoutSessionId String?  @unique @map("stripe_checkout_session_id") @db.VarChar(255)
+  stripePaymentIntentId   String?  @unique @map("stripe_payment_intent_id") @db.VarChar(255)
+
+  customerEmail           String?  @map("customer_email") @db.VarChar(254)
+  customerName            String?  @map("customer_name") @db.VarChar(255)
+
+  shippingName            String?  @map("shipping_name") @db.VarChar(255)
+  shippingLine1           String?  @map("shipping_line1") @db.VarChar(255)
+  shippingLine2           String?  @map("shipping_line2") @db.VarChar(255)
+  shippingCity            String?  @map("shipping_city") @db.VarChar(255)
+  shippingState           String?  @map("shipping_state") @db.VarChar(255)
+  shippingPostalCode      String?  @map("shipping_postal_code") @db.VarChar(32)
+  shippingCountry         String?  @map("shipping_country") @db.Char(2)
+
+  currency                String   @db.Char(3)
+  subtotalAmount          Int      @default(0) @map("subtotal_amount")
+  shippingAmount          Int      @default(0) @map("shipping_amount")
+  taxAmount               Int      @default(0) @map("tax_amount")
+  discountAmount          Int      @default(0) @map("discount_amount")
+  totalAmount             Int      @default(0) @map("total_amount")
+  refundedAmount          Int      @default(0) @map("refunded_amount")
+
+  paymentStatus           PaymentStatus     @default(PENDING) @map("payment_status")
+  fulfillmentStatus       FulfillmentStatus @default(UNFULFILLED) @map("fulfillment_status")
+
+  /// Stock reservation held while checkout is open.
+  reservationStatus       ReservationStatus @default(HELD) @map("reservation_status")
+  reservationExpiresAt    DateTime          @map("reservation_expires_at") @db.DateTime(3)
+
+  /// Set when something needs a person (amount mismatch, stock shortfall).
+  requiresReview          Boolean  @default(false) @map("requires_review")
+  reviewReason            String?  @map("review_reason") @db.Text
+
+  createdAt               DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  paidAt                  DateTime? @map("paid_at") @db.DateTime(3)
+  cancelledAt             DateTime? @map("cancelled_at") @db.DateTime(3)
+
+  items        OrderItem[]
+  movements    InventoryMovement[]
+  shipments    Shipment[]
+  stripeEvents StripeEvent[]
+
+  @@index([paymentStatus])
+  @@index([fulfillmentStatus])
+  @@index([createdAt])
+  @@index([customerEmail])
+  @@index([reservationStatus, reservationExpiresAt])
+  @@index([requiresReview])
+  @@map("orders")
+}
+
+/// Immutable snapshot of what was purchased. Never re-read from the catalog.
+model OrderItem {
+  id          String   @id @default(uuid()) @db.Char(36)
+  orderId     String   @map("order_id") @db.Char(36)
+  productId   String   @map("product_id") @db.VarChar(64)
+  /// The SKU is the variant identifier.
+  sku         String   @db.VarChar(64)
+  productName String   @map("product_name") @db.VarChar(255)
+  variantName String?  @map("variant_name") @db.VarChar(255)
+  quantity    Int
+  unitAmount  Int      @map("unit_amount")
+  lineAmount  Int      @map("line_amount")
+  currency    String   @db.Char(3)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([orderId, sku])
+  @@index([sku])
+  @@map("order_items")
+}
+
+/// Webhook idempotency ledger. One row per Stripe event id, ever.
+model StripeEvent {
+  id            String            @id @default(uuid()) @db.Char(36)
+  stripeEventId String            @unique @map("stripe_event_id") @db.VarChar(255)
+  eventType     String            @map("event_type") @db.VarChar(100)
+  status        StripeEventStatus @default(PROCESSING)
+  orderId       String?           @map("order_id") @db.Char(36)
+  attempts      Int               @default(1)
+  lastError     String?           @map("last_error") @db.Text
+  receivedAt    DateTime          @default(now()) @map("received_at") @db.DateTime(3)
+  processedAt   DateTime?         @map("processed_at") @db.DateTime(3)
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([status, receivedAt])
+  @@map("stripe_events")
+}
+
+/// One row per sellable SKU. Available to sell = quantityOnHand - quantityReserved.
+model Inventory {
+  id               String   @id @default(uuid()) @db.Char(36)
+  sku              String   @unique @db.VarChar(64)
+  productId        String   @map("product_id") @db.VarChar(64)
+  quantityOnHand   Int      @default(0) @map("quantity_on_hand")
+  quantityReserved Int      @default(0) @map("quantity_reserved")
+  createdAt        DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  movements InventoryMovement[]
+
+  @@index([productId])
+  @@map("inventory")
+}
+
+/// Append-only stock ledger: every change to quantityOnHand writes one row.
+model InventoryMovement {
+  id                  String       @id @default(uuid()) @db.Char(36)
+  inventoryId         String       @map("inventory_id") @db.Char(36)
+  orderId             String?      @map("order_id") @db.Char(36)
+  type                MovementType
+  quantityDelta       Int          @map("quantity_delta")
+  quantityOnHandAfter Int          @map("quantity_on_hand_after")
+  reason              String?      @db.VarChar(500)
+  /// External reference, e.g. the Stripe event id that caused a sale.
+  reference           String?      @db.VarChar(255)
+  /// "<orderId>:<inventoryId>" for SALE rows only (NULL otherwise). Unique, so
+  /// an order can deduct stock for a SKU at most once — even under a bug.
+  saleKey             String?      @unique @map("sale_key") @db.VarChar(80)
+  createdAt           DateTime     @default(now()) @map("created_at") @db.DateTime(3)
+
+  inventory Inventory @relation(fields: [inventoryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  order     Order?    @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([inventoryId, createdAt])
+  @@index([orderId])
+  @@map("inventory_movements")
+}
+
+model Shipment {
+  id             String         @id @default(uuid()) @db.Char(36)
+  orderId        String         @map("order_id") @db.Char(36)
+  carrier        String?        @db.VarChar(100)
+  service        String?        @db.VarChar(100)
+  trackingNumber String?        @map("tracking_number") @db.VarChar(100)
+  trackingUrl    String?        @map("tracking_url") @db.VarChar(500)
+  status         ShipmentStatus @default(PENDING)
+  shippedAt      DateTime?      @map("shipped_at") @db.DateTime(3)
+  deliveredAt    DateTime?      @map("delivered_at") @db.DateTime(3)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.DateTime(3)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([carrier, trackingNumber])
+  @@index([orderId])
+  @@map("shipments")
+}

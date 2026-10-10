@@ -1,13 +1,16 @@
 # CRESTMONT HOLDINGS — Home & Everyday Living store
 
 Storefront for **CRESTMONT HOLDINGS LLC** (Missouri), built with Next.js 16
-(App Router), TypeScript, Tailwind CSS 4 and Stripe Checkout.
+(App Router), TypeScript, Tailwind CSS 4, Stripe Checkout, and Prisma ORM
+with a Hostinger MySQL database for orders and inventory. Hosted on Hostinger.
 
 > Before taking real orders, work through [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md).
 > The catalog contains the 12 planned launch products in **coming soon** status
 > (no public prices, photography, specifications or inventory yet), payments are
-> switched off (`commerce.paymentsEnabled = false`), and the order database is
-> not built. See also [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+> switched off (`commerce.paymentsEnabled = false`), and the order & inventory
+> database is built but not yet connected (`operations.orderDatabaseEnabled =
+> false`). See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
+> [`docs/HOSTINGER_SETUP.md`](docs/HOSTINGER_SETUP.md).
 
 ## Getting started
 
@@ -21,7 +24,10 @@ npm run dev                  # http://localhost:3000
 | Script | Purpose |
 | --- | --- |
 | `npm run dev` / `build` / `start` | Develop, build, serve |
-| `npm run lint` / `typecheck` / `test` | ESLint, TypeScript, Vitest |
+| `npm run lint` / `typecheck` | ESLint, TypeScript |
+| `npm test` | All tests (`test:unit` + `test:db`) |
+| `npm run test:db` | Order/inventory tests against a local, disposable MySQL/MariaDB (`TEST_DATABASE_URL`); skipped if unset |
+| `npm run db:migrate:deploy` | Apply pending Prisma migrations (production-safe; see HOSTINGER_SETUP.md) |
 | `npm run check:launch` | Lists every term, credential or catalog item still needing attention |
 
 ## Where things live
@@ -37,6 +43,9 @@ npm run dev                  # http://localhost:3000
 | Navigation | `src/config/navigation.ts` |
 | Pages | `src/app/**/page.tsx` |
 | Checkout / webhook / forms APIs | `src/app/api/**/route.ts` |
+| Database schema / migrations | `prisma/schema.prisma`, `prisma/migrations/` |
+| Order & inventory transactions | `src/lib/orders/service.ts` (via server-only `repository.ts`) |
+| Hostinger setup & deployment | `docs/HOSTINGER_SETUP.md` |
 
 ### Products
 Status lifecycle: `draft` (hidden) → `coming_soon` (shown, not orderable) →
@@ -73,6 +82,9 @@ production, see docs/ARCHITECTURE.md); honeypot fields on forms; signed Stripe w
 secrets server-side only. Never commit `.env*` files.
 
 ## Deployment
-Any Node.js host that runs `next start` (Vercel, a VPS, Hostinger Node, etc.).
-This app lives in the `crestmont-store/` subdirectory — set the project root
-there. Set `NEXT_PUBLIC_SITE_URL` before building.
+Hostinger Node.js app + Hostinger MySQL — step by step in
+[`docs/HOSTINGER_SETUP.md`](docs/HOSTINGER_SETUP.md). This app lives in the
+`crestmont-store/` subdirectory: set the application root there. Build
+`npm run build`, start `npm run start`, Node 22.x. Set `NEXT_PUBLIC_SITE_URL`
+and `SUPPORT_EMAIL` before building. The code has no provider-specific
+dependencies.

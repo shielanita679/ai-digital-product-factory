@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export type SubmitState = { status: "idle" | "submitting" | "success" | "error"; message?: string };
+export type SubmitState = { status: "idle" | "submitting" | "success" | "error"; message?: string; data?: unknown };
 
 /** Posts a form as JSON to an internal API route and tracks the result. */
 export function useSubmit(endpoint: string) {
@@ -17,12 +17,12 @@ export function useSubmit(endpoint: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; message?: string };
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; message?: string; data?: unknown };
       if (!res.ok || !json.ok) {
         setState({ status: "error", message: json.error ?? "Something went wrong. Please try again." });
         return false;
       }
-      setState({ status: "success", message: json.message });
+      setState({ status: "success", message: json.message, data: json.data });
       return true;
     } catch {
       setState({ status: "error", message: "We couldn't reach the server. Check your connection and try again." });

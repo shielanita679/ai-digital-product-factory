@@ -3,6 +3,7 @@ import { findVariantBySku, variantLabel } from "@/lib/catalog";
 import type { CartLine } from "@/lib/cart";
 
 export type PricedLine = {
+  productId: string;
   sku: string;
   name: string;
   variant: string;
@@ -12,10 +13,14 @@ export type PricedLine = {
 };
 
 /**
- * Re-prices a cart against the catalog. Never trusts prices or names from
- * the browser — only SKUs and quantities.
+ * Re-prices a cart against the catalog. Never trusts prices, names, stock or
+ * subtotals from the browser — only SKUs and quantities.
+ *
+ * `checkCatalogStock`: when the order database is enabled, stock is enforced
+ * authoritatively by the database reservation, so the catalog's seed
+ * inventory figure is not used.
  */
-export function priceCart(lines: CartLine[]): { ok: true; lines: PricedLine[]; subtotalCents: number } | { ok: false; error: string } {
+export function priceCart(lines: CartLine[], { checkCatalogStock = true }: { checkCatalogStock?: boolean } = {}): { ok: true; lines: PricedLine[]; subtotalCents: number } | { ok: false; error: string } {
   const merged = new Map<string, number>();
   for (const l of lines) merged.set(l.sku, (merged.get(l.sku) ?? 0) + l.quantity);
 
@@ -24,11 +29,12 @@ export function priceCart(lines: CartLine[]): { ok: true; lines: PricedLine[]; s
     const found = findVariantBySku(sku);
     if (!found) return { ok: false, error: "An item in your cart is no longer available. Please review your cart." };
     const { product, variant } = found;
-    if (variant.inventory < 1) return { ok: false, error: `${product.name} (${variantLabel(variant) || "selected option"}) is out of stock.` };
-    if (quantity > variant.inventory || quantity > commerce.maxQuantityPerLine) {
+    if (checkCatalogStock && variant.inventory < 1) return { ok: false, error: `${product.name} (${variantLabel(variant) || "selected option"}) is out of stock.` };
+    if ((checkCatalogStock && quantity > variant.inventory) || quantity > commerce.maxQuantityPerLine) {
       return { ok: false, error: `The quantity requested for ${product.name} isn't available. Please lower the quantity.` };
     }
     priced.push({
+      productId: product.id,
       sku,
       name: product.name,
       variant: variantLabel(variant),

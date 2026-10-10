@@ -44,7 +44,7 @@ export async function guardJsonPost(
   if (!request.headers.get("content-type")?.includes("application/json")) {
     return { response: jsonError("Unsupported content type.", 415) };
   }
-  const limited = rateLimit(`${opts.bucket}:${clientIp(request)}`, opts.limit, opts.windowMs);
+  const limited = await rateLimit(`${opts.bucket}:${clientIp(request)}`, opts.limit, opts.windowMs);
   if (!limited.ok) {
     return {
       response: jsonError("Too many requests. Please wait a moment and try again.", 429, {

@@ -5,24 +5,25 @@
  */
 export const operations = {
   /**
-   * Hosting provider. Unresolved; the app must stay portable between Vercel,
-   * standard Node.js hosting and VPS/container deployment, so no
-   * provider-specific dependencies are used.
+   * Hosting: Hostinger (Node.js web app + Hostinger MySQL/MariaDB). Set to
+   * the confirmed plan name once the account and plan are in place, e.g.
+   * "Hostinger Business Web Hosting". The app has no provider-specific code
+   * and remains portable.
    */
   hostingProvider: null as string | null,
 
   /**
-   * Order/inventory database. Planned: a NEW, separate Supabase project for
-   * CRESTMONT HOLDINGS (never the AI Digital Product Factory project).
-   * Not built yet — false until orders and inventory are persisted.
+   * Order/inventory database: the Hostinger MySQL database for CRESTMONT
+   * HOLDINGS (Prisma, prisma/schema.prisma). Set to true only after
+   * `prisma migrate deploy` has been run against it and DATABASE_URL is set
+   * (docs/HOSTINGER_SETUP.md). While false, no code path touches a database.
    */
-  orderDatabaseConfigured: false,
+  orderDatabaseEnabled: false,
 
   /**
-   * The current rate limiter (lib/rate-limit.ts) keeps counters in process
-   * memory. It does NOT provide distributed protection on serverless or
-   * multi-instance hosting and must be replaced with a shared store before
-   * production deployment.
+   * The rate limiter's store (lib/rate-limit.ts). "memory" keeps counters in
+   * one Node.js process: it does NOT protect across several processes or
+   * instances. Replace the store before relying on it in that setup.
    */
-  rateLimiter: "in_memory" as "in_memory" | "shared",
+  rateLimiter: "memory" as "memory" | "shared",
 } as const;
